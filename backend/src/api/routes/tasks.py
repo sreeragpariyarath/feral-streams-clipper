@@ -1604,6 +1604,37 @@ async def merge_clips(
         raise HTTPException(status_code=500, detail=f"Error merging clips: {str(e)}")
 
 
+@router.post("/{task_id}/clips/{clip_id}/post-copy")
+async def clip_post_copy(
+    task_id: str, clip_id: str, request: Request, db: AsyncSession = Depends(get_db)
+):
+    """Draft an Instagram caption and a YouTube title and description from the clip. Publishes nothing."""
+    try:
+        task_service = TaskService(db)
+        await _require_task_owner(request, task_service, db, task_id)
+
+        clip = await task_service.clip_repo.get_clip_by_id(db, clip_id)
+        if not clip or clip["task_id"] != task_id:
+            raise HTTPException(status_code=404, detail="Clip not found")
+        if not (clip.get("text") or "").strip() and not (clip.get("hook_title") or "").strip():
+            raise HTTPException(status_code=422, detail="This clip has no transcript to write copy from")
+
+        from ...services.clip_copy_service import generate_clip_copy
+
+        try:
+            return await generate_clip_copy(clip)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc))
+        except Exception as exc:
+            logger.warning("Post copy generation failed (%s)", type(exc).__name__)
+            raise HTTPException(status_code=502, detail="Couldn't write the copy. Try again.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error writing post copy: {e}")
+        raise HTTPException(status_code=500, detail="Error writing post copy")
+
+
 @router.patch("/{task_id}/clips/{clip_id}/captions")
 async def update_clip_captions(
     task_id: str, clip_id: str, request: Request, db: AsyncSession = Depends(get_db)

@@ -1,5 +1,6 @@
 "use client";
 
+import { PostCopy } from "@/components/app/post-copy";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
@@ -285,6 +286,7 @@ export function ClipFocus({ clip, taskId, index, total, busy, editable, onNaviga
                 )}
 
                 {clip.text && <TranscriptPreview text={clip.text} clipTitle={clipTitle(clip, t)} />}
+                <PostCopy taskId={taskId} clipId={clip.id} />
                 {children}
               </div>
               <div className="mt-auto flex flex-wrap items-center gap-2 border-t bg-muted/30 px-5 py-3">
