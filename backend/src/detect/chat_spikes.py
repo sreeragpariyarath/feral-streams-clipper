@@ -196,7 +196,7 @@ class Detector:
         self.hist_m30.append(m30)
         self.hist_u30.append(u30)
         signals = {
-            "m5": m5, "m30": m30, "u30": u30, "emo30": dict(emo),
+            "m5": m5, "m30": m30, "base_m30": base_m30, "u30": u30, "emo30": dict(emo),
             "s_chat": round(s_chat, 3), "s_unique": round(s_unique, 3),
             "s_emote": round(s_emote, 3), "ratio": round(ratio, 2),
             "h_chat": round(h_chat, 3), "s_audio": None if s_audio is None else round(s_audio, 3),
@@ -204,6 +204,12 @@ class Detector:
             "loud_excess_db": excess_db, "spam5": sum(self.spam.get(x, 0) for x in range(sec - 4, sec + 1)),
         }
         return h, m30, ratio, signals
+
+    def _ratio_floor(self, base_m30):
+        """How far above normal chat must be. A big streamer's chat is busy all the time and rarely
+        doubles, so the bar falls from ``min_ratio`` (quiet chat) to 1.15 (about 8+ messages a second)."""
+        busy = max(0.0, min(1.0, (base_m30 - 60) / 190))
+        return max(1.15, self.min_ratio - busy * (self.min_ratio - 1.15))
 
     def tick(self, now):
         """Score every whole second up to now-1. Returns ready candidates."""
@@ -217,7 +223,7 @@ class Detector:
             self.timeline[sec] = round(h, 3)
             if sec - self.first_sec < self.warmup:
                 continue
-            chat_ok = m30 >= self.min_m30 and ratio >= self.min_ratio
+            chat_ok = m30 >= self.min_m30 and ratio >= self._ratio_floor(signals["base_m30"])
             sa = signals["s_audio"]
             hc = signals["h_chat"]
             if sa is None:                                   # chat only

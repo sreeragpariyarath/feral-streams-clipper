@@ -54,3 +54,21 @@ def test_parse_chat_json_reads_text_user_and_offset_in_order():
     assert parse_chat_json(payload) == [(12.5, "ann", "LMAO wow"), (13.0, "bo", "late")]
     assert parse_chat_json({}) == []
     assert parse_chat_json(None) == []
+
+
+def busy_chat(seconds=900, spike_at=500):
+    """A big streamer's chat: about 10 messages a second all the time, 30% more during a reaction."""
+    rng = random.Random(3)
+    messages = []
+    for second in range(seconds):
+        reacting = spike_at <= second < spike_at + 25
+        for i in range(int(rng.gauss(13 if reacting else 10, 1.5))):
+            text = rng.choice(["LMAO", "KEKW", "WTF", "no way", "omg"]) if reacting and i % 2 == 0 else rng.choice(["nice", "gg", "hi", "ok", "yeah"])
+            messages.append((second + rng.random(), f"user{rng.randint(1, 4000)}", text))
+    return sorted(messages)
+
+
+def test_a_busy_chat_reacting_is_still_found():
+    spikes = detect_spikes(busy_chat())
+    assert spikes
+    assert 490 <= spikes[0]["peak_t"] <= 545
