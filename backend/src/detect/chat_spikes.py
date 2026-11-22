@@ -283,14 +283,18 @@ class Detector:
         return out
 
 
-def detect_spikes(messages, cfg=None, *, step=1):
+def detect_spikes(messages, cfg=None, *, step=1, audio_db=None):
     """Chat reaction peaks in a finished replay.
 
     ``messages`` is an iterable of ``(offset_seconds, user, text)`` sorted by offset (video time, not
-    wall clock). Returns the candidate dicts, strongest first, each with ``peak_t`` (seconds into the
+    wall clock). ``audio_db`` is an optional loudness per second of the video (dBFS); with it a spike also
+    needs the streamer to react, which weeds out chat waves the stream itself did not cause. Returns the candidate dicts, strongest first, each with ``peak_t`` (seconds into the
     video where chat peaked), ``h_score`` (0..1), ``chat_top`` and ``chat_samples``.
     """
     det = Detector(cfg)
+    if audio_db is not None:
+        for second, level in enumerate(audio_db):
+            det.feed_audio(second, float(level))
     out = []
     last = 0
     for t, user, text in messages:

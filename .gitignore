@@ -32,3 +32,6 @@ docs/youtube-provider-registry*.json
 node_modules/
 .venv/
 *.tsbuildinfo
+
+# Frame scan model weights (python -m src.media.local_models)
+models/

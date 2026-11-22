@@ -135,6 +135,7 @@ services:
       dockerfile: Dockerfile
       args:
         BACKEND_CPU_ONLY: ${BACKEND_CPU_ONLY:-false}
+        FRAME_SCAN_LIBS: ${FRAME_SCAN_LIBS:-false}
     container_name: supoclip-backend
     # linux/amd64 by default, including on Apple Silicon (emulated). Set
     # BACKEND_PLATFORM=linux/arm64 with BACKEND_CPU_ONLY=true for a native
@@ -151,6 +152,7 @@ services:
       - ./backend/transitions:/app/transitions
       # Drop-in SFX and music beds (FX_LIBRARY_DIR); every render machine mounts the same library.
       - ./backend/fx_library:/app/fx_library
+      - ./models:/app/models:ro
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
@@ -251,6 +253,9 @@ services:
       - SPEAKER_FRAMING=${SPEAKER_FRAMING:-true}
       - GAMING_LAYOUT=${GAMING_LAYOUT:-off}
       - HOOK_CARD=${HOOK_CARD:-off}
+      - FRAME_SCAN=${FRAME_SCAN:-off}
+      - FRAME_SCAN_MODELS_DIR=/app/models
+      - LOUDNESS_HINTS=${LOUDNESS_HINTS:-off}
       - HOOK_FIRST_TEASER=${HOOK_FIRST_TEASER:-false}
       - ASSEMBLY_AI_SPEECH_MODEL=${ASSEMBLY_AI_SPEECH_MODEL:-}
       - FAST_MODE_TRANSCRIPT_MODEL=${FAST_MODE_TRANSCRIPT_MODEL:-universal-3-5-pro}
@@ -367,6 +372,7 @@ services:
       dockerfile: Dockerfile
       args:
         BACKEND_CPU_ONLY: ${BACKEND_CPU_ONLY:-false}
+        FRAME_SCAN_LIBS: ${FRAME_SCAN_LIBS:-false}
     container_name: supoclip-worker
     # Same platform override as the backend service.
     platform: "${BACKEND_PLATFORM:-linux/amd64}"
@@ -382,6 +388,7 @@ services:
       - ./backend/transitions:/app/transitions
       # Drop-in SFX and music beds (FX_LIBRARY_DIR); every render machine mounts the same library.
       - ./backend/fx_library:/app/fx_library
+      - ./models:/app/models:ro
     environment: &worker-environment
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
@@ -487,6 +494,9 @@ services:
       - SPEAKER_FRAMING=${SPEAKER_FRAMING:-true}
       - GAMING_LAYOUT=${GAMING_LAYOUT:-off}
       - HOOK_CARD=${HOOK_CARD:-off}
+      - FRAME_SCAN=${FRAME_SCAN:-off}
+      - FRAME_SCAN_MODELS_DIR=/app/models
+      - LOUDNESS_HINTS=${LOUDNESS_HINTS:-off}
       - HOOK_FIRST_TEASER=${HOOK_FIRST_TEASER:-false}
       - ASSEMBLY_AI_SPEECH_MODEL=${ASSEMBLY_AI_SPEECH_MODEL:-}
       - FAST_MODE_TRANSCRIPT_MODEL=${FAST_MODE_TRANSCRIPT_MODEL:-universal-3-5-pro}
@@ -578,6 +588,7 @@ services:
       dockerfile: Dockerfile
       args:
         BACKEND_CPU_ONLY: ${BACKEND_CPU_ONLY:-false}
+        FRAME_SCAN_LIBS: ${FRAME_SCAN_LIBS:-false}
     container_name: supoclip-cron-worker
     platform: "${BACKEND_PLATFORM:-linux/amd64}"
     command: [".venv/bin/arq", "src.workers.cron_worker.CronWorkerSettings"]
@@ -589,6 +600,7 @@ services:
       - ./backend/transitions:/app/transitions
       # Drop-in SFX and music beds (FX_LIBRARY_DIR); every render machine mounts the same library.
       - ./backend/fx_library:/app/fx_library
+      - ./models:/app/models:ro
     environment: *worker-environment
     restart: unless-stopped
     depends_on:
@@ -612,6 +624,7 @@ services:
       dockerfile: Dockerfile
       args:
         BACKEND_CPU_ONLY: ${BACKEND_CPU_ONLY:-false}
+        FRAME_SCAN_LIBS: ${FRAME_SCAN_LIBS:-false}
     container_name: supoclip-ai-worker
     platform: "${BACKEND_PLATFORM:-linux/amd64}"
     command: [".venv/bin/arq", "src.workers.ai_worker.AIWorkerSettings"]

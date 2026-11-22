@@ -42,11 +42,19 @@ COPY pyproject.toml uv.lock* ./
 
 # New self-hosted setups can select CPU wheels without changing legacy builds.
 ARG BACKEND_CPU_ONLY=false
+# Frame scan's local models (open_clip, PANNs). Off by default: they add a few hundred MB and the weights are ~1 GB.
+ARG FRAME_SCAN_LIBS=false
 RUN uv venv .venv && \
+    extra_libs="" && \
+    if [ "$FRAME_SCAN_LIBS" = "true" ]; then extra_libs="--extra frame-scan"; fi && \
     if [ "$BACKEND_CPU_ONLY" = "true" ]; then \
-      uv sync --frozen --extra cpu; \
+      uv sync --frozen --extra cpu $extra_libs; \
     else \
-      uv sync --frozen --extra cuda; \
+      uv sync --frozen --extra cuda $extra_libs; \
+    fi && \
+    if [ "$FRAME_SCAN_LIBS" = "true" ] && [ "$BACKEND_CPU_ONLY" = "true" ]; then \
+      uv pip install --python .venv/bin/python --reinstall-package torchvision --no-deps \
+        --index-url https://download.pytorch.org/whl/cpu "torchvision==0.28.0"; \
     fi
 
 # yt-dlp and its PO-token plugin are installed from uv.lock above.

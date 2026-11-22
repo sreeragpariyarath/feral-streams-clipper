@@ -109,7 +109,7 @@ from ..media.upload_ingest import (
     upload_needs_remote_copy,
 )
 from ..media_storage import MediaStorage
-from ..twitch_chat import vod_chat_hints
+from ..twitch_chat import loud_hints, scan_hints, vod_chat_hints
 from ..source_range import SourceRange, cut_audio_range, private_link, shift_segment
 from ..media.mp4_fragments import fragmented_mp4_duration
 from ..media.ffmpeg import (
@@ -2305,8 +2305,15 @@ class VideoService:
             final_plan = False
             if workflow == "highlights":
                 chat_signals = None
-                if source_type == "twitch" and not checkpoint.get("analysis"):
-                    chat_signals = await run_in_thread(vod_chat_hints, url)
+                if not checkpoint.get("analysis"):
+                    # Chat offsets are whole-broadcast times: never for a picked part of the video.
+                    if source_type == "twitch" and source_range is None:
+                        chat_signals = await run_in_thread(vod_chat_hints, url, video_path)
+                    if chat_signals is None:
+                        chat_signals = await run_in_thread(loud_hints, video_path)
+                    scanned = await run_in_thread(scan_hints, video_path)
+                    if scanned:
+                        chat_signals = f"{chat_signals}" + chr(10) + f"{scanned}" if chat_signals else scanned
                 instructions = workflow_spec.options.instructions if workflow_spec is not None else ""
                 requested_clips = workflow_spec.setting("max_clips") if workflow_spec is not None else None
                 relevant_parts, segments_json, clip_limit, final_plan = await VideoService._select_highlight_segments(

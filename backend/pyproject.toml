@@ -38,6 +38,8 @@ dependencies = [
 [project.optional-dependencies]
 cpu = ["torch==2.13.0"]
 cuda = ["torch==2.13.0"]
+# Frame scan (FRAME_SCAN=on): local CLIP and PANNs models. Installed when the image is built with FRAME_SCAN_LIBS=true.
+frame-scan = ["open_clip_torch>=2.24.0", "panns-inference>=0.1.1"]
 
 [dependency-groups]
 dev = [
