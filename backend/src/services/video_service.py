@@ -109,9 +109,11 @@ from ..media.upload_ingest import (
     upload_needs_remote_copy,
 )
 from ..media_storage import MediaStorage
+from ..twitch_chat import vod_chat_hints
 from ..source_range import SourceRange, cut_audio_range, private_link, shift_segment
 from ..media.mp4_fragments import fragmented_mp4_duration
 from ..media.ffmpeg import (
+    apply_campaign_overlay,
     cap_video_short_side,
     ffprobe_duration,
     ffprobe_video_size,
@@ -1425,6 +1427,13 @@ class VideoService:
             **({"fx_enabled": True} if fx_jobs else {}),
         )
 
+        for clip_info in clips_info:
+            try:
+                await run_in_thread(apply_campaign_overlay, Path(clip_info["path"]))
+            except Exception as e:
+                # The clip is still good without the logo.
+                logger.warning(f"Campaign overlay skipped for a clip: {e}")
+
         if max_short_side:
             for clip_info in clips_info:
                 try:
@@ -1685,6 +1694,11 @@ class VideoService:
             if not render_report.get("broll_applied"):
                 broll_placements = []
 
+            try:
+                await run_in_thread(apply_campaign_overlay, clip_path)
+            except Exception as e:
+                logger.warning(f"Campaign overlay skipped for clip {clip_index + 1}: {e}")
+
             if max_short_side:
                 try:
                     await run_in_thread(cap_video_short_side, clip_path, max_short_side)
@@ -1791,6 +1805,7 @@ class VideoService:
         save_checkpoint: Callable[[Dict[str, Any]], Awaitable[None]],
         instructions: Optional[str] = None,
         max_clips: Optional[int] = None,
+        chat_signals: Optional[str] = None,
     ) -> tuple[Any, List[Dict[str, Any]], int, bool]:
         """Pick standalone highlights: (analysis, ranked segments with reserve, clip limit, final plan).
 
@@ -1847,6 +1862,11 @@ class VideoService:
             except Exception as exc:
                 logger.warning("Clip signal extraction failed: %s", exc)
                 clip_signals = None
+            if chat_signals:
+                # Where the stream's live chat reacted: a hint like the audio and transcript signals.
+                clip_signals = f"{clip_signals}\n{chat_signals}" if clip_signals else (
+                    "Deterministic clip-worthiness signals to consider before ranking:\n" + chat_signals
+                )
             relevant_parts = await VideoService.analyze_transcript(
                 transcript,
                 clip_signals=clip_signals,
@@ -2284,6 +2304,9 @@ class VideoService:
             workflow_final = checkpoint.get("workflow_final") if workflow != "highlights" else None
             final_plan = False
             if workflow == "highlights":
+                chat_signals = None
+                if source_type == "twitch" and not checkpoint.get("analysis"):
+                    chat_signals = await run_in_thread(vod_chat_hints, url)
                 instructions = workflow_spec.options.instructions if workflow_spec is not None else ""
                 requested_clips = workflow_spec.setting("max_clips") if workflow_spec is not None else None
                 relevant_parts, segments_json, clip_limit, final_plan = await VideoService._select_highlight_segments(
@@ -2301,6 +2324,7 @@ class VideoService:
                     save_checkpoint=save_checkpoint,
                     **({"instructions": instructions} if instructions else {}),
                     **({"max_clips": requested_clips} if requested_clips is not None else {}),
+                    **({"chat_signals": chat_signals} if chat_signals else {}),
                 )
             else:
                 if should_cancel and await should_cancel():

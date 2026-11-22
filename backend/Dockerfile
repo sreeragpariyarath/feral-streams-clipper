@@ -24,6 +24,13 @@ RUN curl -fsSL https://deno.land/install.sh | sh -s v${DENO_VERSION}
 ENV DENO_DIR=/root/.deno
 ENV PATH="/root/.deno/bin:${PATH}"
 
+# TwitchDownloaderCLI (pinned): downloads the chat replay of a Twitch VOD so chat reactions can guide clip selection.
+# Self-contained .NET build; invariant globalization avoids needing ICU in the slim image.
+ARG TWITCH_DOWNLOADER_VERSION=1.56.5
+ARG TARGETARCH
+RUN case "${TARGETARCH:-amd64}" in arm64) asset=LinuxArm64 ;; *) asset=Linux-x64 ;; esac     && curl -fsSL -o /tmp/tdcli.zip "https://github.com/lay295/TwitchDownloader/releases/download/${TWITCH_DOWNLOADER_VERSION}/TwitchDownloaderCLI-${TWITCH_DOWNLOADER_VERSION}-${asset}.zip"     && unzip -o /tmp/tdcli.zip TwitchDownloaderCLI -d /usr/local/bin     && chmod +x /usr/local/bin/TwitchDownloaderCLI     && rm /tmp/tdcli.zip
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
+
 # Install uv package manager
 RUN pip install uv
 

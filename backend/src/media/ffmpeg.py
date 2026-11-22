@@ -9,6 +9,7 @@ from typing import Tuple
 from ..clip_source_map import normalize_source_ranges
 from ..config import get_config
 import json
+import os
 import re
 import subprocess
 import tempfile
@@ -362,6 +363,59 @@ def cap_video_short_side(video_path: Path, short_side: int) -> bool:
         capped_path.unlink(missing_ok=True)
         raise RuntimeError(f"Unable to downscale {video_path}: {result.stderr[-500:]}")
     capped_path.replace(video_path)
+    return True
+
+
+def campaign_overlay_settings() -> Optional[dict]:
+    """The campaign logo overlay from the environment; ``None`` when it is off.
+
+    ``CAMPAIGN_OVERLAY_FILE`` is a PNG on this machine; ``CAMPAIGN_OVERLAY_WIDTH`` its width as a
+    fraction of the clip width (default 0.48) and ``CAMPAIGN_OVERLAY_Y`` its distance from the top as
+    a fraction of the clip height (default 0.015).
+    """
+    raw = (os.environ.get("CAMPAIGN_OVERLAY_FILE") or "").strip()
+    if not raw:
+        return None
+    path = Path(raw)
+    if not path.is_file():
+        return None
+    try:
+        width = float(os.environ.get("CAMPAIGN_OVERLAY_WIDTH") or 0.48)
+        top = float(os.environ.get("CAMPAIGN_OVERLAY_Y") or 0.015)
+    except ValueError:
+        return None
+    return {"path": path, "width": min(max(width, 0.05), 1.0), "top": min(max(top, 0.0), 0.5)}
+
+
+def apply_campaign_overlay(video_path: Path) -> bool:
+    """Burn the campaign logo into a rendered clip in place. Returns whether the file changed.
+
+    A no-op unless ``CAMPAIGN_OVERLAY_FILE`` is set, so clips are byte-identical by default.
+    """
+    settings = campaign_overlay_settings()
+    if settings is None:
+        return False
+    video_width, video_height = ffprobe_video_size(video_path)
+    logo_width = round_to_even(round(video_width * settings["width"]))
+    top = round(video_height * settings["top"])
+    out_path = video_path.with_name(f".{video_path.stem}.overlay{video_path.suffix}")
+    command = [
+        "ffmpeg", "-y", "-v", "error",
+        "-i", str(video_path),
+        "-i", str(settings["path"]),
+        "-filter_complex",
+        f"[1:v]scale={logo_width}:-1,format=rgba[logo];[0:v][logo]overlay=(W-w)/2:{top}:format=auto,setsar=1[v]",
+        "-map", "[v]", "-map", "0:a?",
+        *build_final_video_encode_args(),
+        "-c:a", "copy",
+        "-movflags", "+faststart",
+        str(out_path),
+    ]
+    result = run_ffmpeg_command(command)
+    if result.returncode != 0 or not out_path.exists():
+        out_path.unlink(missing_ok=True)
+        raise RuntimeError(f"Unable to add the campaign overlay to {video_path}: {result.stderr[-500:]}")
+    out_path.replace(video_path)
     return True
 
 

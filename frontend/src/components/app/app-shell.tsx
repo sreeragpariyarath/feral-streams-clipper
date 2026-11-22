@@ -3,21 +3,16 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useLocale, useTranslations } from "next-intl";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import {
-  CornerDownLeft, Film, KeyRound, LayoutGrid, ListChecks, ListOrdered, Play, Rocket, Search, Send, SlidersHorizontal, Target, Users, Wand2,
+  Film, PanelLeftClose, PanelLeftOpen, Plus, KeyRound, LayoutGrid, Send, SlidersHorizontal, Wand2,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import { useSocialAccess } from "@/hooks/use-social-access";
-import { fetchGenerations, timeAgo, type GenerationSummary } from "@/lib/generations";
-import { StatusBadge } from "@/components/app/status-badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAppTheme } from "@/components/theme-provider";
-import { availableWorkflows, useWorkflowsInfo } from "@/components/workflow-picker";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Kbd } from "@/components/ui/kbd";
 import { cn } from "@/lib/utils";
 import { FeatureTourHost } from "@/components/feature-tour";
 import type { Workflow } from "@/lib/workflows";
@@ -64,20 +59,22 @@ export function AppShell({ children, tour: tourProp }: { children: React.ReactNo
   const { data: session } = useSession();
   const pathname = usePathname();
   const router = useRouter();
-  const [paletteOpen, setPaletteOpen] = useState(false);
   // The editor is a full-screen workspace with its own back button: no app
   // chrome there. Elements stay in place (hidden) so children keep their position.
   const immersive = /^\/tasks\/[^/]+\/edit/.test(pathname);
-  const compact = immersive;
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => {
+    try { setExpanded(localStorage.getItem("sidebar-expanded") === "1"); } catch {}
+  }, []);
+  const toggleExpanded = () => setExpanded((open) => {
+    try { localStorage.setItem("sidebar-expanded", open ? "0" : "1"); } catch {}
+    return !open;
+  });
+  const compact = !expanded;
   const navigate = useCallback((path: string) => router.push(path), [router]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        setPaletteOpen((open) => !open);
-        return;
-      }
       const target = event.target as HTMLElement | null;
       const typing = target?.closest("input, textarea, select, [contenteditable=true], [role=dialog]");
       if (!typing && !event.metaKey && !event.ctrlKey && !event.altKey && event.key.toLowerCase() === "n") {
@@ -104,45 +101,57 @@ export function AppShell({ children, tour: tourProp }: { children: React.ReactNo
     <div data-app-shell={user ? "" : undefined} className={cn(user && "flex min-h-dvh bg-canvas")}>
       {user ? <aside
         className={cn(
-          "sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-sidebar-border bg-sidebar",
+          "sticky top-3 m-3 hidden h-[calc(100dvh-1.5rem)] shrink-0 flex-col rounded-3xl bg-sidebar px-3 pb-14 pt-4 transition-[width] duration-200",
+          compact ? "w-[72px] items-center" : "w-60",
           !immersive && "md:flex",
-          compact ? "w-16 items-center px-2" : "w-60 px-3",
         )}
       >
-        <Link href="/" aria-label="Feral Streams" className={cn("flex h-16 items-center", compact ? "justify-center" : "px-2")}>
-          <Image src="/logo.png" alt="Feral Streams" width={40} height={40} className="size-10" priority />
+        <div className={cn("flex w-full items-center", compact ? "flex-col gap-3" : "justify-between pl-1")}>
+          <Link href="/" aria-label="Feral Streams" className="flex size-11 items-center justify-center rounded-full bg-sidebar-accent ring-1 ring-white/5">
+            <Image src="/logo.png" alt="Feral Streams" width={32} height={32} className="size-8" priority />
+          </Link>
+          <button type="button" onClick={toggleExpanded} aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"} className="flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground">
+            {expanded ? <PanelLeftClose className="size-[18px]" /> : <PanelLeftOpen className="size-[18px]" />}
+          </button>
+        </div>
+
+        <Link
+          href="/"
+          aria-label={t("nav.newGeneration")}
+          className={cn(
+            "group mt-6 box-border flex h-12 min-w-0 items-center rounded-2xl bg-primary text-sm font-semibold text-primary-foreground shadow-[0_6px_20px_-8px] shadow-primary/60 transition hover:-translate-y-px hover:shadow-primary/80",
+            compact ? "w-12 justify-center" : "w-full gap-3 px-2.5",
+          )}
+        >
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-black/10 transition-transform group-hover:rotate-90">
+            <Plus className="size-[18px]" strokeWidth={2.5} />
+          </span>
+          {!compact && <>
+            <span className="min-w-0 flex-1 truncate text-left">{t("nav.newGeneration")}</span>
+            <kbd className="shrink-0 rounded-md border border-black/15 px-1.5 py-0.5 font-sans text-[10px] font-semibold leading-none opacity-70">N</kbd>
+          </>}
         </Link>
 
-        <SidebarLink compact={compact} href="/" label={t("nav.newGeneration")} shortcut="N" className="mb-5 h-10 rounded-full bg-gradient-to-r from-red-600 to-rose-500 text-white shadow-md shadow-red-500/25 hover:from-red-600/90 hover:to-rose-500/90 hover:text-white">
-          <Rocket className="size-4" />
-        </SidebarLink>
+        <nav aria-label={t("search.mainNav")} className={cn("mt-7 flex w-full flex-col gap-1", compact && "items-center")}>
+          {!compact && <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/70">Menu</p>}
+          {items.filter((item) => item.labelKey !== "settings" && item.labelKey !== "agents").map((item) => (
+            <SidebarLink key={item.href} compact={compact} href={item.href} label={item.label} active={item.match(pathname)} tour={`nav-${item.labelKey}`}>
+              <item.icon className="size-[18px]" />
+            </SidebarLink>
+          ))}
 
-        <nav aria-label={t("search.mainNav")} className="flex w-full flex-col gap-0.5">
-          {items.map((item) => {
-            const active = item.match(pathname);
-            return (
-              <SidebarLink key={item.href} compact={compact} href={item.href} label={item.label} active={active} tour={"labelKey" in item ? `nav-${item.labelKey}` : undefined}>
-                <item.icon className="size-4" />
-              </SidebarLink>
-            );
-          })}
+          {!compact && <p className="mb-1 mt-6 px-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/70">More</p>}
+          {compact && <div className="my-2 h-px w-8 bg-border" />}
+          {items.filter((item) => item.labelKey === "agents" || item.labelKey === "settings").map((item) => (
+            <SidebarLink key={item.href} compact={compact} href={item.href} label={item.label} active={item.match(pathname)} tour={`nav-${item.labelKey}`}>
+              <item.icon className="size-[18px]" />
+            </SidebarLink>
+          ))}
         </nav>
 
-        <button
-          type="button"
-          onClick={() => setPaletteOpen(true)}
-          className={cn(
-            "mt-5 flex h-10 w-full items-center gap-2 rounded-xl border border-dashed border-sidebar-border bg-transparent text-sm text-muted-foreground transition-colors hover:text-foreground",
-            compact ? "justify-center px-0" : "px-2.5",
-          )}
-          aria-label={t("search.generations")}
-        >
-          <Search className="size-4 shrink-0" />
-          {!compact && <><span className="flex-1 text-left">{t("search.label")}</span><Kbd>⌘K</Kbd></>}
-        </button>
-
-        <div className={cn("mt-auto flex w-full pb-3", compact ? "justify-center" : "px-1")}>
-          <ThemeToggle tooltipSide="right" className="flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-sidebar-accent hover:text-foreground [&_svg]:size-5" />
+        <div className={cn("mt-auto flex w-full items-center", compact ? "justify-center" : "justify-between rounded-2xl bg-sidebar-accent/60 py-1.5 pl-3 pr-1.5")}>
+          {!compact && <span className="text-xs font-medium text-muted-foreground">Theme</span>}
+          <ThemeToggle tooltipSide="right" className="flex size-9 items-center justify-center rounded-xl bg-sidebar-accent text-foreground hover:bg-sidebar-accent/70 [&_svg]:size-[18px]" />
         </div>
       </aside> : null}
 
@@ -153,9 +162,6 @@ export function AppShell({ children, tour: tourProp }: { children: React.ReactNo
           </Link>
           <div className="flex items-center gap-1">
             <ThemeToggle tooltipSide="bottom" className="rounded-lg p-2 hover:bg-accent [&_svg]:size-5" />
-            <button type="button" onClick={() => setPaletteOpen(true)} aria-label={t("search.generations")} className="rounded-lg p-2 text-muted-foreground hover:bg-accent">
-              <Search className="size-5" />
-            </button>
           </div>
         </header> : null}
         {children}
@@ -173,7 +179,6 @@ export function AppShell({ children, tour: tourProp }: { children: React.ReactNo
         })}
       </nav> : null}
 
-      {user ? <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} /> : null}
       <FeatureTourHost
         enabled={Boolean(user) && !immersive}
         pathname={pathname}
@@ -199,9 +204,10 @@ function SidebarLink({ href, label, active, compact, shortcut, className, tour, 
       aria-current={active ? "page" : undefined}
       aria-label={compact ? label : undefined}
       className={cn(
-        "relative flex h-10 w-full items-center gap-3 rounded-xl text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "relative flex h-11 w-full items-center gap-3 rounded-2xl text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         compact ? "justify-center" : "px-3",
-        active ? "bg-sidebar-accent text-sidebar-accent-foreground before:absolute before:-left-3 before:top-2 before:h-6 before:w-1 before:rounded-r-full before:bg-brand" : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground",
+        active && "bg-sidebar-accent [&_svg]:text-primary",
+        active ? "text-foreground before:absolute before:-left-[14px] before:top-2.5 before:h-6 before:w-1 before:rounded-r-full before:bg-primary" : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground",
         className,
       )}
     >
@@ -212,114 +218,4 @@ function SidebarLink({ href, label, active, compact, shortcut, className, tour, 
   );
   if (!compact) return link;
   return <Tooltip><TooltipTrigger asChild>{link}</TooltipTrigger><TooltipContent side="right">{label}</TooltipContent></Tooltip>;
-}
-
-type PaletteEntry = { id: string; label: string; hint?: string; href: string; icon: typeof Film; generation?: GenerationSummary };
-
-// "New series" and friends open the create screen with that workflow picked.
-const WORKFLOW_SHORTCUTS = [
-  { id: "series", icon: ListOrdered },
-  { id: "topic", icon: Target },
-  { id: "recap", icon: ListChecks },
-  { id: "trailer", icon: Play },
-] as const;
-
-function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const t = useTranslations("shell");
-  const tHome = useTranslations("home");
-  const locale = useLocale();
-  const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [generations, setGenerations] = useState<GenerationSummary[]>([]);
-  const [active, setActive] = useState(0);
-  const listRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    setQuery("");
-    setActive(0);
-    void fetchGenerations().then(setGenerations).catch(() => {});
-  }, [open]);
-
-  const socialAccess = useSocialAccess(open);
-  const workflowsInfo = useWorkflowsInfo(open);
-  const entries = useMemo<PaletteEntry[]>(() => {
-    const q = query.trim().toLowerCase();
-    const offered = availableWorkflows(workflowsInfo);
-    const actions: PaletteEntry[] = [
-      { id: "new", label: t("nav.newGeneration"), hint: t("palette.newHint"), href: "/", icon: Rocket },
-      ...WORKFLOW_SHORTCUTS.filter((shortcut) => offered.has(shortcut.id)).map((shortcut) => ({
-        id: `new-${shortcut.id}`, label: tHome(`palette.${shortcut.id}`), href: `/?workflow=${shortcut.id}`, icon: shortcut.icon,
-      })),
-      { id: "library", label: t("palette.library"), href: "/list", icon: LayoutGrid },
-      ...(socialAccess === true ? [{ id: "social", label: t("palette.social"), hint: t("palette.socialHint"), href: "/settings/social", icon: Send }] : []),
-      { id: "keys", label: t("nav.agents"), hint: t("palette.agentsHint"), href: "/settings/api-keys", icon: KeyRound },
-      { id: "team", label: t("palette.team"), hint: t("palette.teamHint"), href: "/settings/team", icon: Users },
-      { id: "settings", label: t("nav.settings"), href: "/settings", icon: SlidersHorizontal },
-    ].filter((entry) => !q || entry.label.toLowerCase().includes(q));
-    const matches = generations
-      .filter((generation) => !q || generation.source_title.toLowerCase().includes(q))
-      .slice(0, 8)
-      .map((generation) => ({
-        id: generation.id, label: generation.source_title, hint: timeAgo(generation.created_at, locale),
-        href: `/tasks/${generation.id}`, icon: Film, generation,
-      }));
-    return [...actions, ...matches];
-  }, [generations, query, socialAccess, workflowsInfo, t, tHome, locale]);
-
-  const go = useCallback((entry: PaletteEntry | undefined) => {
-    if (!entry) return;
-    onOpenChange(false);
-    router.push(entry.href);
-  }, [onOpenChange, router]);
-
-  useEffect(() => {
-    listRef.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: "nearest" });
-  }, [active]);
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent showCloseButton={false} className="top-[18%] max-w-xl translate-y-0 gap-0 overflow-hidden p-0">
-        <DialogTitle className="sr-only">{t("search.dialog")}</DialogTitle>
-        <div className="flex items-center gap-3 border-b px-4">
-          <Search className="size-4 text-muted-foreground" />
-          <input
-            autoFocus
-            value={query}
-            onChange={(event) => { setQuery(event.target.value); setActive(0); }}
-            onKeyDown={(event) => {
-              if (event.key === "ArrowDown") { event.preventDefault(); setActive((i) => Math.min(entries.length - 1, i + 1)); }
-              if (event.key === "ArrowUp") { event.preventDefault(); setActive((i) => Math.max(0, i - 1)); }
-              if (event.key === "Enter") { event.preventDefault(); go(entries[active]); }
-            }}
-            placeholder={t("search.placeholder")}
-            aria-label={t("search.inputLabel")}
-            className="h-12 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-          />
-          <Kbd>esc</Kbd>
-        </div>
-        <div ref={listRef} className="max-h-80 overflow-y-auto p-1.5" role="listbox">
-          {entries.length === 0 && <p className="px-3 py-8 text-center text-sm text-muted-foreground">{t("search.empty", { query })}</p>}
-          {entries.map((entry, index) => (
-            <button
-              key={entry.id}
-              type="button"
-              role="option"
-              aria-selected={index === active}
-              data-index={index}
-              onMouseMove={() => setActive(index)}
-              onClick={() => go(entry)}
-              className={cn("flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm", index === active && "bg-accent")}
-            >
-              <entry.icon className="size-4 shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1 truncate">{entry.label}</span>
-              {entry.generation ? <StatusBadge status={entry.generation.status} /> : null}
-              {entry.hint && <span className="shrink-0 text-xs text-muted-foreground">{entry.hint}</span>}
-              {index === active && <CornerDownLeft className="size-3.5 text-muted-foreground" />}
-            </button>
-          ))}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
 }

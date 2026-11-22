@@ -21,7 +21,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     <AppThemeScope.Provider value={setShellActive}>
       <NextThemesProvider
         attribute="class"
-        defaultTheme="light"
+        defaultTheme="dark"
         enableSystem={false}
         forcedTheme={themed ? undefined : "light"}
         disableTransitionOnChange

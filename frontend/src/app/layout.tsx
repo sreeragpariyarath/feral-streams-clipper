@@ -8,7 +8,6 @@ import { AttributionTracker } from "@/components/attribution-tracker";
 import { DataFastIdentity } from "@/components/datafast-identity";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { FeedbackButton } from "@/components/feedback-button";
 import { PostHogIdentity } from "@/components/posthog-identity";
 import { ThemeProvider } from "@/components/theme-provider";
 import { intlLocale } from "@/i18n/config";
@@ -140,7 +139,6 @@ export default async function RootLayout({
               <DataFastIdentity />
               <PostHogIdentity />
               <AttributionTracker />
-              <FeedbackButton />
               <Toaster />
             </TooltipProvider>
           </NextIntlClientProvider>
