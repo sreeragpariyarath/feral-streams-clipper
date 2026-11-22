@@ -746,3 +746,7 @@ and network transfer are billed separately.
 The publishing and scheduling form drafts editable captions with `claude-haiku-5-5`.
 This requires `ANTHROPIC_API_KEY`, independently of the clip-selection `LLM`.
 Drafting failures keep the caption editable and posting available. No migration is required.
+
+## Interface language
+
+The web interface uses English. Set `TRANSCRIPTION_LANGUAGE` to control the language used for transcription, or leave it unset for automatic detection when the provider supports it.

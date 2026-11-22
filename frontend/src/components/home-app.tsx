@@ -18,7 +18,7 @@ import { VideoSourceIcon } from "@/components/video-source-icon";
 import { availableWorkflows, useWorkflowsInfo, WorkflowPicker } from "@/components/workflow-picker";
 import { changedSettings, invalidSetting, WorkflowAdvancedSettings, type AdvancedValues } from "@/components/workflow-advanced";
 import { FONT_SEARCH_THRESHOLD, formatUploadLimit, getYouTubeThumbnailUrl, maxVideoUploadBytes, readVideoDuration, uploadVideoFile, validateVideoSourceUrl } from "@/lib/video-upload";
-import { AppShell } from "@/components/app/app-shell";
+import { useShellTour } from "@/components/app/app-shell";
 import { GenerationCard } from "@/components/app/generation-card";
 import { VideoDownloadStatus } from "@/components/app/video-download-status";
 import { SourceRangePicker } from "@/components/source-range-picker";
@@ -1031,6 +1031,8 @@ export default function HomeApp() {
     }
   };
 
+  useShellTour({ busy: hasSource || isLoading || upgradeReason !== null, onWorkflow: previewWorkflow, onEnd: endTour, onSettingsSection: openSettingsSection });
+
   if (isPending || !session?.user) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
@@ -1050,7 +1052,7 @@ export default function HomeApp() {
     : null;
 
   return (
-    <AppShell tour={{ busy: hasSource || isLoading || upgradeReason !== null, onWorkflow: previewWorkflow, onEnd: endTour, onSettingsSection: openSettingsSection }}>
+    <>
       <main className="mx-auto w-full max-w-5xl px-4 pb-20 pt-10 sm:px-8 md:pt-[12vh]">
         {billingSummary?.cancel_at && billingSummary.subscription_provider === "stripe" && (
           <SubscriptionCancelBanner
@@ -1627,7 +1629,7 @@ export default function HomeApp() {
         billing={billingSummary}
         source="home"
       />
-    </AppShell>
+    </>
   );
 }
 

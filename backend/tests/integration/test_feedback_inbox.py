@@ -230,20 +230,6 @@ async def test_delivery_fails_after_the_last_attempt(client, db_session, clean, 
     assert (row["status"], row["attempts"]) == ("failed", delivery.MAX_ATTEMPTS)
 
 
-async def test_a_permanent_error_fails_at_once_and_an_admin_can_retry(client, db_session, clean, receiver, admin, auth_headers, no_immediate):
-    submission_id, _hook, _ = await _one_submission(client, db_session)
-    receiver.statuses = [404]
-    assert await delivery.deliver_due(db_session) == {"failed": 1}
-    [row] = await deliveries(db_session, submission_id=submission_id)
-
-    response = await client.post(f"/admin/feedback/deliveries/{row['id']}/retry", headers=auth_headers)
-    assert response.status_code == 200
-    assert no_immediate[-1] == submission_id
-    assert await delivery.deliver_due(db_session) == {"delivered": 1}
-    # A delivered one can't be retried again.
-    assert (await client.post(f"/admin/feedback/deliveries/{row['id']}/retry", headers=auth_headers)).status_code == 409
-
-
 async def test_a_claimed_delivery_is_not_sent_twice(client, db_session, clean, receiver, no_immediate, initialized_database):
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -300,129 +286,12 @@ ADMIN_ROUTES = [
 
 
 @pytest.mark.parametrize(("method", "path", "body"), ADMIN_ROUTES)
-async def test_every_admin_route_requires_an_admin(client, db_session, clean, method, path, body):
+async def test_retired_feedback_admin_routes_are_unavailable(client, db_session, clean, method, path, body):
     await create_user(db_session, user_id="user-1", is_admin=False)
     signed = headers_for("user-1")
-    assert (await client.request(method, path, json=body)).status_code == 401
-    assert (await client.request(method, path, json=body, headers=signed)).status_code == 403
+    assert (await client.request(method, path, json=body)).status_code == 404
+    assert (await client.request(method, path, json=body, headers=signed)).status_code == 404
     assert (await db_session.execute(text("SELECT COUNT(*) FROM feedback_webhooks"))).scalar() == 0
-
-
-async def test_admin_lists_filters_and_triages_submissions(client, db_session, clean, admin, auth_headers, no_immediate):
-    ana = await create_user(db_session, email="ana@example.com", name="Ana")
-    bo = await create_user(db_session, email="bo@example.com", name="Bo")
-    bug = (await submit(client, ana["id"], category="bug", message="Crash on export")).json()["id"]
-    await submit(client, bo["id"], category="sales", message="Team plan?")
-
-    listed = (await client.get("/admin/feedback", headers=auth_headers)).json()
-    assert listed["total"] == 2 and listed["status_counts"] == {"open": 2, "in_progress": 0, "resolved": 0}
-    by_category = (await client.get("/admin/feedback?category=sales", headers=auth_headers)).json()
-    assert [i["email"] for i in by_category["items"]] == ["bo@example.com"]
-    by_search = (await client.get("/admin/feedback?q=ANA@", headers=auth_headers)).json()
-    assert [i["id"] for i in by_search["items"]] == [bug]
-    assert (await client.get(f"/admin/feedback?q={ana['id']}", headers=auth_headers)).json()["total"] == 1
-    assert (await client.get("/admin/feedback?q=%25", headers=auth_headers)).json()["total"] == 0
-    assert (await client.get("/admin/feedback?from=2099-01-01T00:00:00Z", headers=auth_headers)).json()["total"] == 0
-
-    updated = (await client.patch(f"/admin/feedback/{bug}", json={"status": "resolved"}, headers=auth_headers)).json()
-    assert updated["submission"]["status"] == "resolved" and updated["submission"]["resolved_by"] == "user-1"
-    assert updated["submission"]["resolved_at"] is not None
-    note = await client.post(f"/admin/feedback/{bug}/notes", json={"body": "Fixed in 2.5"}, headers=auth_headers)
-    assert note.status_code == 201
-    detail = (await client.get(f"/admin/feedback/{bug}", headers=auth_headers)).json()["submission"]
-    assert detail["user_name"] == "Ana" and [n["body"] for n in detail["notes"]] == ["Fixed in 2.5"]
-    reopened = (await client.patch(f"/admin/feedback/{bug}", json={"status": "open"}, headers=auth_headers)).json()
-    assert reopened["submission"]["resolved_at"] is None
-    assert (await client.patch(f"/admin/feedback/{bug}", json={"status": "done"}, headers=auth_headers)).status_code == 422
-    assert (await client.get("/admin/feedback/missing", headers=auth_headers)).status_code == 404
-
-
-async def test_webhook_urls_and_secrets_never_come_back(client, db_session, clean, admin, auth_headers, receiver):
-    created = await client.post(
-        "/admin/feedback-webhooks",
-        json={"name": "Zapier", "kind": "json", "url": JSON_URL, "categories": ["bug", "sales"]},
-        headers=auth_headers,
-    )
-    assert created.status_code == 201
-    secret = created.json()["secret"]
-    assert secret.startswith("whsec_")
-    webhook = created.json()["webhook"]
-    assert webhook["url_hint"] == "hooks.example.com/…PATH" and webhook["categories"] == ["bug", "sales"]
-    discord = await client.post(
-        "/admin/feedback-webhooks",
-        json={"name": "Discord", "kind": "discord", "url": DISCORD, "categories": ["general"]},
-        headers=auth_headers,
-    )
-    assert discord.json()["secret"] is None
-
-    hook_id = webhook["id"]
-    responses = [
-        await client.get("/admin/feedback-webhooks", headers=auth_headers),
-        await client.patch(f"/admin/feedback-webhooks/{hook_id}", json={"name": "Renamed", "url": ""}, headers=auth_headers),
-        await client.post(f"/admin/feedback-webhooks/{hook_id}/test", headers=auth_headers),
-        await client.get(f"/admin/feedback-webhooks/{hook_id}/deliveries", headers=auth_headers),
-    ]
-    for response in responses:
-        assert response.status_code == 200, response.text
-        assert "PRIVATE-PATH" not in response.text and "SECRET-DISCORD-TOKEN" not in response.text
-        assert secret not in response.text
-    stored = (await db_session.execute(text("SELECT url_encrypted, secret_encrypted FROM feedback_webhooks WHERE id = :id"),
-                                       {"id": hook_id})).one()
-    assert "hooks.example.com" not in stored[0] and secret not in stored[1]
-    # An empty URL kept the old one: the test went to it.
-    assert receiver.calls[0]["url"] == JSON_URL and receiver.calls[0]["body"]["type"] == "feedback.test"
-    assert responses[3].json()["deliveries"][0]["is_test"] is True
-    assert responses[3].json()["deliveries"][0]["attempt_log"][0]["attempt"] == 1
-
-    rotated = (await client.post(f"/admin/feedback-webhooks/{hook_id}/rotate-secret", headers=auth_headers)).json()["secret"]
-    assert rotated != secret
-    assert (await client.post(f"/admin/feedback-webhooks/{discord.json()['webhook']['id']}/rotate-secret",
-                              headers=auth_headers)).status_code == 404
-    assert (await client.delete(f"/admin/feedback-webhooks/{hook_id}", headers=auth_headers)).status_code == 200
-    assert (await client.delete(f"/admin/feedback-webhooks/{hook_id}", headers=auth_headers)).status_code == 404
-
-
-@pytest.mark.parametrize(
-    ("kind", "url", "code"),
-    [
-        ("json", "http://hooks.example.com/x", "url_not_https"),
-        ("json", "https://169.254.169.254/latest/meta-data", "url_private_address"),
-        ("json", "https://localhost:8000/admin", "url_private_address"),
-        ("json", "https://10.1.2.3/x", "url_private_address"),
-        ("discord", "https://hooks.example.com/api/webhooks/1/x", "url_not_discord"),
-    ],
-)
-async def test_unsafe_webhook_urls_are_refused(client, db_session, clean, admin, auth_headers, kind, url, code):
-    response = await client.post(
-        "/admin/feedback-webhooks", json={"name": "x", "kind": kind, "url": url, "categories": ["bug"]}, headers=auth_headers
-    )
-    assert response.status_code == 422
-    assert response.json()["detail"]["code"] == code
-    assert (await db_session.execute(text("SELECT COUNT(*) FROM feedback_webhooks"))).scalar() == 0
-
-
-async def test_a_host_resolving_to_a_private_address_is_refused(client, db_session, clean, admin, auth_headers, monkeypatch):
-    monkeypatch.undo()  # the real check, with a resolver that answers with an internal address
-    monkeypatch.setenv("APP_SETTINGS_ENCRYPTION_KEY", "feedback-inbox-test-key-0123456789")
-    loop = asyncio.get_running_loop()
-
-    async def getaddrinfo(host, port, type=0):  # noqa: A002
-        return [(2, 1, 6, "", ("10.0.0.9", port))]
-
-    monkeypatch.setattr(loop, "getaddrinfo", getaddrinfo)
-    response = await client.post(
-        "/admin/feedback-webhooks",
-        json={"name": "x", "kind": "json", "url": "https://internal.example.com/x", "categories": ["bug"]},
-        headers=auth_headers,
-    )
-    assert response.status_code == 422 and response.json()["detail"]["code"] == "url_private_address"
-
-
-async def test_webhook_input_is_validated(client, db_session, clean, admin, auth_headers):
-    base = {"name": "x", "kind": "json", "url": JSON_URL, "categories": ["bug"]}
-    for override in ({"categories": []}, {"categories": ["spam"]}, {"kind": "slack"}, {"name": ""}):
-        response = await client.post("/admin/feedback-webhooks", json={**base, **override}, headers=auth_headers)
-        assert response.status_code == 422, override
 
 
 # --- Environment import and migration ------------------------------------------------
@@ -669,24 +538,6 @@ async def test_two_api_slots_import_only_one_destination(db_session, clean, app,
     assert len(await webhooks.list_webhooks(db_session)) == 1
 
 
-@pytest.mark.parametrize("body", [
-    {"kind": "json", "url": DISCORD, "categories": ["bug"]},
-    {"name": "Hook", "kind": "json", "url": DISCORD},
-    {"name": "Hook", "kind": "json", "url": {"secret": DISCORD}, "categories": ["bug"]},
-])
-async def test_invalid_webhook_bodies_never_echo_secrets(client, clean, admin, auth_headers, caplog, body):
-    response = await client.post("/admin/feedback-webhooks", json=body, headers=auth_headers)
-    assert response.status_code == 422
-    assert "SECRET-DISCORD-TOKEN" not in response.text + caplog.text
-
-
-async def test_invalid_webhook_json_never_echoes_secrets(client, clean, admin, auth_headers, caplog):
-    response = await client.post("/admin/feedback-webhooks", content='{"url":"' + DISCORD + '" BROKEN}',
-                                headers={**auth_headers, "content-type": "application/json"})
-    assert response.status_code == 422
-    assert "SECRET-DISCORD-TOKEN" not in response.text + caplog.text
-
-
 async def test_disabling_waits_for_uncommitted_fanout(db_session, clean, initialized_database):
     from sqlalchemy.ext.asyncio import async_sessionmaker
     from src.feedback.service import SubmissionInput, submit_feedback
@@ -848,63 +699,6 @@ async def test_an_ignored_hermes_delivery_is_retried_with_the_same_id(client, db
     await make_due(db_session)
     assert await delivery.deliver_due(db_session) == {"delivered": 1}
     assert hermes.calls[0]["body"]["delivery_id"] == hermes.calls[1]["body"]["delivery_id"] == row["id"]
-
-
-async def test_admins_can_only_switch_test_and_read_the_hermes_webhook(
-    client, db_session, clean, app, admin, auth_headers, hermes, no_immediate
-):
-    await webhooks.sync_hermes_webhook(db_session, hermes_config(app))
-    listed = await client.get("/admin/feedback-webhooks", headers=auth_headers)
-    [webhook] = [w for w in listed.json()["webhooks"] if w["kind"] == "hermes"]
-    assert webhook["name"] == "Hermes assistant" and webhook["url_hint"] == ""
-    assert "8644" not in listed.text and HERMES_SECRET not in listed.text
-    hook = f"/admin/feedback-webhooks/{webhook['id']}"
-
-    for change in ({"name": "Mine"}, {"url": "https://hooks.example.com/x"}, {"categories": ["bug"]}):
-        response = await client.patch(hook, json=change, headers=auth_headers)
-        assert response.status_code == 422 and response.json()["detail"]["code"] == "webhook_managed", change
-    assert (await client.delete(hook, headers=auth_headers)).status_code == 409
-    assert (await client.post(f"{hook}/rotate-secret", headers=auth_headers)).status_code == 404
-    created = await client.post("/admin/feedback-webhooks", headers=auth_headers,
-                                json={"name": "x", "kind": "hermes", "url": HERMES_URL, "categories": ["bug"]})
-    assert created.status_code == 422
-
-    tested = await client.post(f"{hook}/test", headers=auth_headers)
-    assert tested.status_code == 200 and tested.json()["delivery"]["status"] == "delivered"
-    sample = hermes.calls[-1]["body"]
-    assert sample["submission"]["category"] == "test" and sample["submission"]["message"] == "Test from SupoClip admin"
-    assert sample["delivery_id"] == tested.json()["delivery"]["id"]
-    log = (await client.get(f"{hook}/deliveries", headers=auth_headers)).json()["deliveries"]
-    assert log[0]["is_test"] and log[0]["status"] == "delivered"
-
-    # Off stays off across restarts; the URL and secret follow the environment.
-    assert (await client.patch(hook, json={"enabled": False}, headers=auth_headers)).status_code == 200
-    assert await webhooks.sync_hermes_webhook(db_session, hermes_config(app, secret="ROTATED")) == "updated"
-    destination = await webhooks.load_destination(db_session, webhook["id"])
-    assert destination["enabled"] is False and destination["secret"] == "ROTATED" and destination["url"] == HERMES_URL
-    user = await create_user(db_session)
-    await submit(client, user["id"])
-    assert [d for d in await deliveries(db_session) if not d["is_test"]] == []
-
-
-async def test_a_failed_hermes_test_is_reported(client, db_session, clean, app, admin, auth_headers, hermes):
-    await webhooks.sync_hermes_webhook(db_session, hermes_config(app))
-    row = await hermes_row(db_session)
-    hermes.answers = [(200, {"status": "ignored"})]
-    tested = (await client.post(f"/admin/feedback-webhooks/{row['id']}/test", headers=auth_headers)).json()["delivery"]
-    assert tested["status"] == "failed" and tested["error"] == "HTTP 200 ignored"
-
-
-async def test_admin_entered_webhooks_still_cannot_point_at_the_gateway(client, db_session, clean, app, admin, auth_headers):
-    await webhooks.sync_hermes_webhook(db_session, hermes_config(app))
-    for url in (HERMES_URL, "https://127.0.0.1:8644/p/supoclip/webhooks/feedback-supoclip"):
-        response = await client.post("/admin/feedback-webhooks", headers=auth_headers,
-                                      json={"name": "x", "kind": "json", "url": url, "categories": ["bug"]})
-        assert response.status_code == 422 and response.json()["detail"]["code"] in ("url_not_https", "url_private_address")
-    hook = (await make_webhook(db_session, kind="json", url=JSON_URL))[0]
-    response = await client.patch(f"/admin/feedback-webhooks/{hook['id']}", headers=auth_headers,
-                                  json={"url": "https://127.0.0.1:8644/p/supoclip/webhooks/feedback-supoclip"})
-    assert response.status_code == 422 and response.json()["detail"]["code"] == "url_private_address"
 
 
 async def test_older_releases_cannot_queue_for_or_redirect_hermes(client, db_session, clean, app, hermes, no_immediate):

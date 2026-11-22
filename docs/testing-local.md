@@ -87,7 +87,7 @@ Run it after Playwright finishes; browser reseeding would delete its test accoun
 
 - Backend: `TEST_DATABASE_URL=postgresql+asyncpg://... backend/.venv/bin/pytest -c backend/pyproject.toml backend/tests -q`
 - Frontend: `pnpm run lint`, `pnpm run typecheck`, `pnpm run test:coverage`, `pnpm run build`.
-- Seeded browser smoke tests: `pnpm run test:e2e`.
+- Seeded local-owner smoke tests: `pnpm run test:e2e`. These use a dedicated test database and verify the Library without signing in. The real-media workflow is opt-in with `PLAYWRIGHT_LOCAL_MEDIA=1 pnpm run test:e2e --project=local-media` and needs a running worker and configured media providers.
 - Isolated mocked UI regressions: `pnpm run test:polish`.
 
 Use Node 24 LTS for the browser runner. Node 26 on the tested workstation stalled

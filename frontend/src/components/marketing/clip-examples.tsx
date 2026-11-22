@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
 import { DEMO_CLIPS, DEMO_SOURCE, getDemoSourceMomentUrl } from "@/lib/demo";
@@ -26,7 +25,6 @@ export async function ClipExamples({ locale }: { locale: string }) {
         ))}
       </div>
       <p className="text-sm leading-7 text-muted-foreground">{t("note")}</p>
-      <Link href="/demo" className="inline-flex text-sm font-semibold underline underline-offset-4">{t("details")}</Link>
     </section>
   );
 }

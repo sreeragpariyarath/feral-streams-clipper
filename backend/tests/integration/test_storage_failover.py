@@ -81,23 +81,6 @@ async def test_failover_preserves_task_ownership(client, db_session, auth_header
     fallback_storage.client.generate_presigned_url.assert_not_called()
 
 
-async def test_shared_playback_also_uses_fallback(client, db_session, fallback_storage):
-    task, clip = await seeded_clip(db_session)
-    token = "storage-failover-test-share-token"
-    await db_session.execute(text("UPDATE tasks SET share_enabled=true,share_token=:token WHERE id=:id"),
-                             {"token": token, "id": task["id"]})
-    await db_session.commit()
-    response = await client.get(f"/tasks/shared/{token}/clips/{clip['id']}/file")
-    assert response.status_code == 307
-    assert "r2.example" in response.headers["location"]
-    await db_session.execute(text("UPDATE tasks SET share_enabled=false WHERE id=:id"), {"id": task["id"]})
-    await db_session.commit()
-    fallback_storage.client.generate_presigned_url.reset_mock()
-    response = await client.get(f"/tasks/shared/{token}/clips/{clip['id']}/file")
-    assert response.status_code == 404
-    fallback_storage.client.generate_presigned_url.assert_not_called()
-
-
 @pytest.mark.parametrize("status,age,expected", [("healthy", 0, 200), ("degraded", 0, 503), ("healthy", 200, 503)])
 async def test_storage_health_uses_cached_probe_and_rejects_stale_results(client, shared_ledger, status, age, expected):
     config = get_config()

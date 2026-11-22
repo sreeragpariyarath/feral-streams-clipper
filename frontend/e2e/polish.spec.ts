@@ -108,19 +108,6 @@ test("task completion retries a transient clip-read failure", async ({ page }) =
 });
 
 
-test("signed-out settings displays the sign-in gate without loading preferences", async ({ page }) => {
-  let preferenceReads = 0;
-  await page.route("**/api/auth/get-session**", route => route.fulfill({ json: null }));
-  await page.route("**/api/preferences", route => {
-    preferenceReads++;
-    return route.fulfill({ status: 401, json: { error: "Unauthorized" } });
-  });
-  await page.goto("/settings");
-  await expect(page.getByRole("heading", { name: "Sign In Required" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Sign In", exact: true })).toHaveAttribute("href", "/sign-in");
-  await expect(page.getByRole("button", { name: /save preferences/i })).toHaveCount(0);
-  expect(preferenceReads).toBe(0);
-});
 
 test("signed-in settings waits for preferences before showing the form", async ({ page }) => {
   let finish!: () => void;
@@ -221,16 +208,6 @@ for (const path of ["/", "/tasks/one"]) {
 }
 
 
-test("signed-out pages hydrate consistently after the shared session resolves", async ({ page }) => {
-  const errors: string[] = [];
-  page.on("pageerror", error => errors.push(error.message));
-  await page.route("**/api/auth/get-session**", route => route.fulfill({ json: null }));
-  for (const path of ["/list", "/settings", "/settings/api-keys"]) {
-    await page.goto(path);
-    await expect(page.getByRole("link", { name: "Sign In", exact: true })).toBeVisible();
-  }
-  expect(errors).toEqual([]);
-});
 
 
 test("API keys require verification while existing keys remain manageable", async ({ page }) => {

@@ -25,8 +25,6 @@ activated users (people who export a clip), not just visits.
 **Visual assets in the repo**
 
 - `assets/banner.jpg`: README cover / social header
-- `frontend/public/blog/supoclip-editor.webp`: real editor screenshot (sample test footage)
-- `frontend/public/blog/supoclip-open-source-clipping.webp`: illustration (AI-generated, label it as such)
 - `frontend/public/clips/demo-{1,2}.mp4` + `.jpg`: demo clip previews
 
 > **Rights note:** the demo clips come from a third-party interview

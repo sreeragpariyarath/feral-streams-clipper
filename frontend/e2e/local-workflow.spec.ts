@@ -1,9 +1,7 @@
 import { expect, test, type Page, type APIResponse } from "@playwright/test";
 import fs from "node:fs";
-import path from "node:path";
 import { execFileSync } from "node:child_process";
 
-const seed = JSON.parse(fs.readFileSync(path.join(process.cwd(), "e2e/.seed.json"), "utf8"));
 const sourceUrl = process.env.LOCAL_TEST_YOUTUBE_URL ?? "https://www.youtube.com/watch?v=jNQXAC9IVRw";
 const sourceFile = process.env.LOCAL_TEST_VIDEO_PATH;
 let taskId: string;
@@ -12,13 +10,6 @@ let clipId: string;
 async function ok(response: APIResponse) {
   expect(response.ok(), `${response.status()}: ${await response.text()}`).toBeTruthy();
   return response.json();
-}
-async function signIn(page: Page) {
-  await page.goto("/sign-in");
-  await page.getByPlaceholder("Email").fill(seed.regular.email);
-  await page.getByPlaceholder("Password").fill(seed.regular.password);
-  await page.getByRole("button", { name: "Sign In", exact: true }).click();
-  await page.waitForURL("**/");
 }
 async function waitForTask(page: Page, id: string) {
   await expect.poll(async () => {
@@ -33,7 +24,7 @@ function probe(file: string) {
 }
 
 test.describe.serial("real local processing and editing", () => {
-  test.beforeEach(async ({ page }) => { await signIn(page); });
+  test.beforeEach(async ({ page }) => { await page.goto("/"); });
 
   test("YouTube submission, live completion, playback and mobile layout", async ({ page }, info) => {
     test.setTimeout(540_000);
@@ -132,19 +123,7 @@ test.describe.serial("real local processing and editing", () => {
     expect((await range.body()).length).toBe(1024);
   });
 
-  test("sharing, revocation, ownership and server export", async ({ page, browser }, info) => {
-    const share = await ok(await page.request.post(`/api/tasks/${taskId}/share`));
-    const anonymous = await browser.newContext();
-    const publicPage = await anonymous.newPage();
-    await publicPage.goto(`/share/${share.share_token}`);
-    await expect(publicPage.locator("video").first()).toBeVisible();
-    expect((await publicPage.request.get(`/api/tasks/${taskId}`)).status()).toBe(401);
-    const publicTask = await ok(await publicPage.request.get(`/api/share/${share.share_token}`));
-    expect(publicTask.user_id).toBeUndefined();
-    expect(publicTask.clips[0].file_path).toBeUndefined();
-    await ok(await page.request.delete(`/api/tasks/${taskId}/share`));
-    expect((await publicPage.request.get(`/api/share/${share.share_token}`)).status()).toBe(404);
-    await anonymous.close();
+  test("exports a vertical MP4 on the server", async ({ page }, info) => {
     const result = await page.request.get(`/api/tasks/${taskId}/clips/${clipId}/export?preset=reels`, { timeout: 120_000 });
     expect(result.ok()).toBeTruthy();
     const file = info.outputPath("server-export.mp4");
@@ -170,27 +149,8 @@ test.describe.serial("real local processing and editing", () => {
 
 
 test.describe("accounts and settings with real services", () => {
-  test("signup, signout, incorrect password and private route protection", async ({ page }) => {
-    await page.goto("/sign-up");
-    await page.getByPlaceholder("Full Name").fill("Local test account");
-    const email = `local-${Date.now()}@supoclip.test`;
-    await page.getByPlaceholder("Email").fill(email);
-    await page.getByPlaceholder("Password").fill("LocalTestPassword123!");
-    await page.getByRole("button", { name: "Sign Up", exact: true }).click();
-    await page.waitForURL("**/");
-    expect((await page.request.get("/api/preferences")).status()).toBe(200);
-    await page.getByRole("button", { name: "Sign out", exact: true }).click();
-    await page.waitForURL("**/sign-in");
-    expect((await page.request.get("/api/tasks")).status()).toBe(401);
-    await page.goto("/sign-in");
-    await page.getByPlaceholder("Email").fill(email);
-    await page.getByPlaceholder("Password").fill("IncorrectPassword");
-    await page.getByRole("button", { name: "Sign In", exact: true }).click();
-    await expect(page.getByText(/invalid email or password/i)).toBeVisible();
-  });
-
   test("preferences persist, invalid inputs fail, API keys authenticate and revoke", async ({ page }) => {
-    await signIn(page);
+    await page.goto("/");
     const saved = await ok(await page.request.patch("/api/preferences", { data: { fontSize: 30, fontColor: "#ABCDEF", notifyOnCompletion: false } }));
     expect(saved.fontSize).toBe(30);
     expect(await ok(await page.request.get("/api/preferences"))).toMatchObject({ fontSize: 30, fontColor: "#ABCDEF", notifyOnCompletion: false });
@@ -204,11 +164,10 @@ test.describe("accounts and settings with real services", () => {
     expect(listing.api_keys.some((k: { key?: string }) => k.key)).toBeFalsy();
     await ok(await page.request.delete(`/api/api-keys/${key.id}`));
     expect((await page.request.get(`${backend}/tasks/`, { headers: { Authorization: `Bearer ${key.key}` } })).status()).toBe(401);
-    expect((await page.request.get("/api/admin/runtime-settings")).status()).toBe(403);
   });
 
   test("custom font upload, retrieval and deletion", async ({ page }) => {
-    await signIn(page);
+    await page.goto("/");
     const fonts = await ok(await page.request.get("/api/fonts"));
     expect(fonts.fonts.length).toBeGreaterThan(0);
     const fontName = fonts.fonts.find((f: { scope: string }) => f.scope === "system").name;

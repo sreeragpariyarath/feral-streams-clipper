@@ -290,3 +290,5 @@ Warning: `docker-compose down -v` deletes database and Redis data.
 Set `SUPOCLIP_LOCAL_OWNER_ID` in the frontend container to an existing local user ID and keep the frontend port published on loopback only. Open `http://localhost:3107` by default. Set `SUPOCLIP_LOCAL_ORIGIN` to the exact localhost origin if the port changes. All local browser requests use that account, including its existing Library. Clear the owner setting to restore normal sign-in. Do not enable this on a shared or publicly accessible instance.
 
 The localhost owner mode disables checkout, subscription management, and payment webhooks. Self-hosted clip generation uses the existing unmetered workspace policy.
+
+For the local Feral Streams Clipper interface, use Create, Library, and Settings. Export an MP4 from a completed job to share it outside the workspace. The public viewer and invitation pages have been removed.

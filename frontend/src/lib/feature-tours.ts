@@ -2,7 +2,7 @@ import type { Workflow } from "@/lib/workflows";
 
 /**
  * Short tours on the real page: a welcome for new accounts, and new features for people
- * who already use SupoClip. Adding one: write an entry here and its text in messages/<locale>/tours.json,
+ * who already use Feral Streams. Adding one: write an entry here and its text in messages/<locale>/tours.json,
  * and put `data-tour="<target>"` on what each step points at. See docs/feature-tours.md.
  */
 export type TourStep = {
@@ -106,7 +106,6 @@ export const FEATURE_TOURS: readonly FeatureTour[] = [
       { path: "/list", target: "library-header", message: "library", side: "bottom" },
       { path: "/list", target: "library-content", message: "libraryClips", side: "top" },
       { path: "/settings/social", requires: "nav-social", target: "social-connect", message: "social", side: "bottom" },
-      { path: "/analytics", requires: "nav-analytics", target: "analytics-header", message: "analytics", side: "bottom" },
       { path: "/settings/api-keys", target: "assistant-connect", message: "agents", side: "bottom" },
       { path: "/settings", target: "settings-captions", message: "captions", side: "bottom" },
       { path: "/settings", requires: "usage", target: "settings-plan", message: "plan", side: "top" },

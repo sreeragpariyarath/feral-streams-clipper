@@ -608,60 +608,6 @@ async def test_task_detail_and_list_expose_workflow_fields(client, db_session, t
 
 
 @pytest.mark.asyncio
-async def test_share_exposes_only_the_public_workflow_subset(client, db_session, tmp_path):
-    owner, task_id = await workflow_task(db_session, tmp_path, user_id="user-1")
-    plan = {
-        **PLAN,
-        "topic": {"query": "money", "canonical": "Money", "coverage": "strong", "found": 2,
-                  "suggested_topics": ["hiring"]},
-        "points": [{"label": "Point", "ranges": [[1.0, 2.0]], "output_start": 0.0}],
-        "beats": [{"role": "cold_open", "ranges": [[1.0, 2.0]], "output_start": 0.0, "why": "Private beat reason"}],
-        "error": {"code": "plan_failed", "details": {}},
-        "notes": [*PLAN["notes"], {"code": "SPONSOR_SKIPPED", "params": {}, "skipped": [[61.0, 90.0]]}],
-        "skips": [[88, 91]],
-        "seconds": 58.2,
-        "stats": {**PLAN["stats"], "stages": {"series_draft": {"calls": 1, "output_tokens": 13200}}},
-    }
-    await TaskRepository.save_workflow_plan(db_session, task_id, plan)
-    meta = {**META, "points": [{"label": "Intro", "kind": "opener", "range_index": 0, "output_start": 0.0,
-                                "droppable": False}]}
-    await add_clip(db_session, tmp_path, task_id, 1, workflow_role="part", part_number=1, workflow_meta=meta)
-    headers = headers_for(owner["id"])
-    token = (await client.post(f"/tasks/{task_id}/share", headers=headers)).json()["share_token"]
-
-    public = (await client.get(f"/tasks/shared/{token}")).json()
-
-    assert public["workflow"] == "series"
-    assert public["workflow_plan"] == {
-        "version": "wf-v1",
-        "workflow": "series",
-        "title": "How we almost lost the company",
-        "notes": [
-            {"code": "PART_COUNT_REDUCED", "params": {"requested": 3, "actual": 2}},
-            {"code": "SPONSOR_SKIPPED", "params": {}},
-        ],
-        "parts": [{"part_number": 1, "title": "The bank calls"}, {"part_number": 2, "title": "Twice"}],
-        "points": [{"label": "Point"}],
-        "beats": [{"role": "cold_open"}],
-        "topic": {"query": "money", "canonical": "Money", "coverage": "strong", "found": 2},
-    }
-    clip = public["clips"][0]
-    assert (clip["part_number"], clip["workflow_role"]) == (1, "part")
-    assert clip["workflow_meta"] == {
-        "title": "The bank calls",
-        "ends_on": "cliff",
-        "part_count": 2,
-        "points": [{"label": "Intro", "kind": "opener", "range_index": 0, "output_start": 0.0}],
-    }
-    assert "Private summary" not in str(public) and "suggested_topics" not in str(public)
-    assert "plan_failed" not in str(public) and "first_unit" not in str(public)
-    assert "post_caption" not in str(public) and "ranges" not in str(public)
-    assert "skipped" not in str(public)
-    assert "Private beat reason" not in str(public) and "skips" not in str(public)
-    assert "stages" not in str(public) and "output_tokens" not in str(public)
-
-
-@pytest.mark.asyncio
 async def test_clip_ready_payload_carries_part_numbers(db_session, tmp_path):
     _, task_id = await workflow_task(db_session, tmp_path)
     clip_id = await add_clip(db_session, tmp_path, task_id, 1, workflow_role="part", part_number=1, workflow_meta=META)

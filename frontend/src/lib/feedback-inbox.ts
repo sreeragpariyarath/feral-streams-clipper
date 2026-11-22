@@ -1,4 +1,4 @@
-/** Admin feedback inbox: the backend's shapes (backend/src/api/routes/admin_feedback.py). */
+/** Admin feedback inbox: the backend's shapes. */
 
 export const FEEDBACK_CATEGORIES = ["bug", "feature", "general", "sales", "cancellation"] as const;
 export const FEEDBACK_STATUSES = ["open", "in_progress", "resolved"] as const;

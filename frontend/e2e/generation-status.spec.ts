@@ -40,7 +40,6 @@ for (const viewport of [{ name: "desktop", width: 1440, height: 900 }, { name: "
     await expect(status).toContainText("YouTube imports · Outage");
     await expect(status).toContainText(incident.headline);
     await expect(status).toContainText(incident.description);
-    await expect(status.getByRole("link", { name: "View status page" })).toHaveAttribute("href", "/status");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
     if (process.env.CAPTURE_STATUS_SCREENSHOTS) {

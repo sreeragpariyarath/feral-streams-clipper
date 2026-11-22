@@ -4,16 +4,14 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Bot, ChartColumn, CornerDownLeft, Film, ListChecks, ListOrdered, Play, Plus, Search, Settings, Share2, Shield, Sparkles, Target, Users,
+  CornerDownLeft, Film, KeyRound, LayoutGrid, ListChecks, ListOrdered, Play, Rocket, Search, Send, SlidersHorizontal, Target, Users, Wand2,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
-import { useBillingSummary } from "@/hooks/use-billing-summary";
 import { useSocialAccess } from "@/hooks/use-social-access";
 import { fetchGenerations, timeAgo, type GenerationSummary } from "@/lib/generations";
 import { StatusBadge } from "@/components/app/status-badge";
-import { Announcements } from "@/components/announcements";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAppTheme } from "@/components/theme-provider";
 import { availableWorkflows, useWorkflowsInfo } from "@/components/workflow-picker";
@@ -22,8 +20,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Kbd } from "@/components/ui/kbd";
 import { cn } from "@/lib/utils";
 import { FeatureTourHost } from "@/components/feature-tour";
-import { WorkspaceSwitcher } from "@/components/workspace/workspace-switcher";
-import { AccountMenu } from "@/components/app/account-menu";
 import type { Workflow } from "@/lib/workflows";
 
 // `mobile: false` keeps an item out of the five-slot mobile tab bar.
@@ -31,12 +27,11 @@ import type { Workflow } from "@/lib/workflows";
 type NavItem = { href: string; labelKey: "create" | "library" | "social" | "analytics" | "agents" | "settings"; icon: typeof Film; match: (path: string) => boolean; mobile?: boolean; social?: boolean };
 
 const NAV: NavItem[] = [
-  { href: "/", labelKey: "create", icon: Sparkles, match: (p) => p === "/" },
-  { href: "/list", labelKey: "library", icon: Film, match: (p) => p.startsWith("/list") || p.startsWith("/tasks") },
-  { href: "/settings/social", labelKey: "social", icon: Share2, match: (p) => p.startsWith("/settings/social"), social: true },
-  { href: "/analytics", labelKey: "analytics", icon: ChartColumn, match: (p) => p.startsWith("/analytics"), social: true },
-  { href: "/settings/api-keys", labelKey: "agents", icon: Bot, match: (p) => p.startsWith("/settings/api-keys"), mobile: false },
-  { href: "/settings", labelKey: "settings", icon: Settings, match: (p) => p === "/settings" },
+  { href: "/", labelKey: "create", icon: Wand2, match: (p) => p === "/" },
+  { href: "/list", labelKey: "library", icon: LayoutGrid, match: (p) => p.startsWith("/list") || p.startsWith("/tasks") },
+  { href: "/settings/social", labelKey: "social", icon: Send, match: (p) => p.startsWith("/settings/social"), social: true },
+  { href: "/settings/api-keys", labelKey: "agents", icon: KeyRound, match: (p) => p.startsWith("/settings/api-keys"), mobile: false },
+  { href: "/settings", labelKey: "settings", icon: SlidersHorizontal, match: (p) => p === "/settings" },
 ];
 
 /** What the create screen tells the tour host; other pages need nothing. */
@@ -49,14 +44,27 @@ export type ShellTour = {
   onSettingsSection?: (id: string) => void;
 };
 
+const ShellTourContext = createContext<(tour: ShellTour | undefined) => void>(() => {});
+
+/** The create screen registers its tour with the shared shell; other pages register nothing. */
+export function useShellTour(tour: ShellTour) {
+  const setTour = useContext(ShellTourContext);
+  const { busy, onWorkflow, onEnd, onSettingsSection } = tour;
+  useEffect(() => {
+    setTour({ busy, onWorkflow, onEnd, onSettingsSection });
+    return () => setTour(undefined);
+  }, [setTour, busy, onWorkflow, onEnd, onSettingsSection]);
+}
+
 /** Signed-in application chrome: sidebar on desktop, tab bar on mobile, ⌘K palette and feature tours everywhere. */
-export function AppShell({ children, tour }: { children: React.ReactNode; /** Set by the create screen, the only page a tour starts on. */ tour?: ShellTour }) {
+export function AppShell({ children, tour: tourProp }: { children: React.ReactNode; /** Set by the create screen, the only page a tour starts on. */ tour?: ShellTour }) {
   const t = useTranslations("shell");
+  const [registeredTour, setRegisteredTour] = useState<ShellTour | undefined>(undefined);
+  const tour = tourProp ?? registeredTour;
   const { data: session } = useSession();
   const pathname = usePathname();
   const router = useRouter();
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [billing] = useBillingSummary(Boolean(session?.user));
   // The editor is a full-screen workspace with its own back button: no app
   // chrome there. Elements stay in place (hidden) so children keep their position.
   const immersive = /^\/tasks\/[^/]+\/edit/.test(pathname);
@@ -85,14 +93,14 @@ export function AppShell({ children, tour }: { children: React.ReactNode; /** Se
   // loaded — otherwise the page remounts and re-runs its initial fetches.
   const user = session?.user;
   useAppTheme(Boolean(user));
-  const admin = Boolean((user as { is_admin?: boolean } | undefined)?.is_admin);
   const socialAccess = useSocialAccess(Boolean(user));
   const labeled = NAV.map((item) => ({ ...item, label: t(`nav.${item.labelKey}`) }));
   const nav = labeled.filter((item) => !item.social || socialAccess === true);
   const mobileNav = nav.filter((item) => item.mobile !== false);
-  const items = admin ? [...nav, { href: "/admin", label: t("nav.admin"), icon: Shield, match: (p: string) => p.startsWith("/admin") }] : nav;
+  const items = nav;
 
   return (
+    <ShellTourContext.Provider value={setRegisteredTour}>
     <div data-app-shell={user ? "" : undefined} className={cn(user && "flex min-h-dvh bg-canvas")}>
       {user ? <aside
         className={cn(
@@ -101,15 +109,12 @@ export function AppShell({ children, tour }: { children: React.ReactNode; /** Se
           compact ? "w-16 items-center px-2" : "w-60 px-3",
         )}
       >
-        <Link href="/" className={cn("flex h-14 items-center gap-2 font-display text-lg font-bold tracking-tight", compact ? "justify-center" : "px-2")}>
-          <Image src="/logo.png" alt="" width={24} height={24} className="size-6 dark:invert" priority />
-          {!compact && "SupoClip"}
+        <Link href="/" aria-label="Feral Streams" className={cn("flex h-16 items-center", compact ? "justify-center" : "px-2")}>
+          <Image src="/logo.png" alt="Feral Streams" width={40} height={40} className="size-10" priority />
         </Link>
 
-        <WorkspaceSwitcher compact={compact} className="mb-3" />
-
-        <SidebarLink compact={compact} href="/" label={t("nav.newGeneration")} shortcut="N" className="mb-4 bg-foreground text-background hover:bg-foreground/90 hover:text-background">
-          <Plus className="size-4" />
+        <SidebarLink compact={compact} href="/" label={t("nav.newGeneration")} shortcut="N" className="mb-5 h-10 rounded-full bg-gradient-to-r from-red-600 to-rose-500 text-white shadow-md shadow-red-500/25 hover:from-red-600/90 hover:to-rose-500/90 hover:text-white">
+          <Rocket className="size-4" />
         </SidebarLink>
 
         <nav aria-label={t("search.mainNav")} className="flex w-full flex-col gap-0.5">
@@ -127,7 +132,7 @@ export function AppShell({ children, tour }: { children: React.ReactNode; /** Se
           type="button"
           onClick={() => setPaletteOpen(true)}
           className={cn(
-            "mt-4 flex h-9 w-full items-center gap-2 rounded-lg border border-sidebar-border bg-background text-sm text-muted-foreground transition-colors hover:text-foreground",
+            "mt-5 flex h-10 w-full items-center gap-2 rounded-xl border border-dashed border-sidebar-border bg-transparent text-sm text-muted-foreground transition-colors hover:text-foreground",
             compact ? "justify-center px-0" : "px-2.5",
           )}
           aria-label={t("search.generations")}
@@ -136,19 +141,17 @@ export function AppShell({ children, tour }: { children: React.ReactNode; /** Se
           {!compact && <><span className="flex-1 text-left">{t("search.label")}</span><Kbd>⌘K</Kbd></>}
         </button>
 
-        <div className="mt-auto w-full pb-3">
-          <AccountMenu user={user} billing={billing} compact={compact} />
+        <div className={cn("mt-auto flex w-full pb-3", compact ? "justify-center" : "px-1")}>
+          <ThemeToggle tooltipSide="right" className="flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-sidebar-accent hover:text-foreground [&_svg]:size-5" />
         </div>
       </aside> : null}
 
       <div className={cn(user && "flex min-w-0 flex-1 flex-col", user && !immersive && "pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0")}>
         {user && !immersive ? <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-background/80 px-4 backdrop-blur md:hidden">
           <Link href="/" className="flex items-center gap-2 font-display text-lg font-bold tracking-tight">
-            <Image src="/logo.png" alt="" width={22} height={22} className="size-[22px] dark:invert" />SupoClip
+            <Image src="/logo.png" alt="" width={22} height={22} className="size-[22px]" />Feral Streams
           </Link>
           <div className="flex items-center gap-1">
-            <WorkspaceSwitcher compact className="size-9 border-0 bg-transparent" />
-            <Announcements key={user.id} userId={user.id} compact />
             <ThemeToggle tooltipSide="bottom" className="rounded-lg p-2 hover:bg-accent [&_svg]:size-5" />
             <button type="button" onClick={() => setPaletteOpen(true)} aria-label={t("search.generations")} className="rounded-lg p-2 text-muted-foreground hover:bg-accent">
               <Search className="size-5" />
@@ -182,6 +185,7 @@ export function AppShell({ children, tour }: { children: React.ReactNode; /** Se
         onSettingsSection={tour?.onSettingsSection}
       />
     </div>
+    </ShellTourContext.Provider>
   );
 }
 
@@ -195,9 +199,9 @@ function SidebarLink({ href, label, active, compact, shortcut, className, tour, 
       aria-current={active ? "page" : undefined}
       aria-label={compact ? label : undefined}
       className={cn(
-        "flex h-9 w-full items-center gap-2.5 rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        compact ? "justify-center" : "px-2.5",
-        active ? "bg-background text-foreground shadow-xs ring-1 ring-sidebar-border" : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
+        "relative flex h-10 w-full items-center gap-3 rounded-xl text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        compact ? "justify-center" : "px-3",
+        active ? "bg-sidebar-accent text-sidebar-accent-foreground before:absolute before:-left-3 before:top-2 before:h-6 before:w-1 before:rounded-r-full before:bg-brand" : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground",
         className,
       )}
     >
@@ -243,16 +247,15 @@ function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (
     const q = query.trim().toLowerCase();
     const offered = availableWorkflows(workflowsInfo);
     const actions: PaletteEntry[] = [
-      { id: "new", label: t("nav.newGeneration"), hint: t("palette.newHint"), href: "/", icon: Plus },
+      { id: "new", label: t("nav.newGeneration"), hint: t("palette.newHint"), href: "/", icon: Rocket },
       ...WORKFLOW_SHORTCUTS.filter((shortcut) => offered.has(shortcut.id)).map((shortcut) => ({
         id: `new-${shortcut.id}`, label: tHome(`palette.${shortcut.id}`), href: `/?workflow=${shortcut.id}`, icon: shortcut.icon,
       })),
-      { id: "library", label: t("palette.library"), href: "/list", icon: Film },
-      ...(socialAccess === true ? [{ id: "social", label: t("palette.social"), hint: t("palette.socialHint"), href: "/settings/social", icon: Share2 },
-      { id: "analytics", label: t("nav.analytics"), hint: t("palette.analyticsHint"), href: "/analytics", icon: ChartColumn }] : []),
-      { id: "keys", label: t("nav.agents"), hint: t("palette.agentsHint"), href: "/settings/api-keys", icon: Bot },
+      { id: "library", label: t("palette.library"), href: "/list", icon: LayoutGrid },
+      ...(socialAccess === true ? [{ id: "social", label: t("palette.social"), hint: t("palette.socialHint"), href: "/settings/social", icon: Send }] : []),
+      { id: "keys", label: t("nav.agents"), hint: t("palette.agentsHint"), href: "/settings/api-keys", icon: KeyRound },
       { id: "team", label: t("palette.team"), hint: t("palette.teamHint"), href: "/settings/team", icon: Users },
-      { id: "settings", label: t("nav.settings"), href: "/settings", icon: Settings },
+      { id: "settings", label: t("nav.settings"), href: "/settings", icon: SlidersHorizontal },
     ].filter((entry) => !q || entry.label.toLowerCase().includes(q));
     const matches = generations
       .filter((generation) => !q || generation.source_title.toLowerCase().includes(q))

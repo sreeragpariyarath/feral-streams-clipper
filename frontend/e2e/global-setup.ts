@@ -3,14 +3,10 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 
 import { PrismaClient } from "../src/generated/prisma";
-import { hashPassword } from "better-auth/crypto";
 
 export default async function globalSetup() {
   const prisma = new PrismaClient();
-  const now = new Date();
   const regularEmail = "e2e-user@supoclip.test";
-  const adminEmail = "e2e-admin@supoclip.test";
-  const password = "Password123!";
 
   await prisma.$executeRawUnsafe(`
     DELETE FROM generated_clips
@@ -18,54 +14,33 @@ export default async function globalSetup() {
       SELECT tasks.id
       FROM tasks
       INNER JOIN users ON users.id = tasks.user_id
-      WHERE users.email IN ('${regularEmail}', '${adminEmail}')
+      WHERE users.email = '${regularEmail}'
     )
   `);
   await prisma.task.deleteMany({
-    where: { user: { email: { in: [regularEmail, adminEmail] } } },
+    where: { user: { email: regularEmail } },
   });
   await prisma.source.deleteMany({
-    where: { tasks: { some: { user: { email: { in: [regularEmail, adminEmail] } } } } },
+    where: { tasks: { some: { user: { email: regularEmail } } } },
   });
   await prisma.account.deleteMany({
-    where: { user: { email: { in: [regularEmail, adminEmail] } } },
+    where: { user: { email: regularEmail } },
   });
   await prisma.session.deleteMany({
-    where: { user: { email: { in: [regularEmail, adminEmail] } } },
+    where: { user: { email: regularEmail } },
   });
   await prisma.user.deleteMany({
-    where: { email: { in: [regularEmail, adminEmail] } },
+    where: { email: regularEmail },
   });
-
-  const passwordHash = await hashPassword(password);
 
   const regularUser = await prisma.user.create({
     data: {
+      id: "feral-e2e-owner",
       email: regularEmail,
       name: "E2E User",
       is_admin: false,
     },
   });
-  const adminUser = await prisma.user.create({
-    data: {
-      email: adminEmail,
-      name: "E2E Admin",
-      is_admin: true,
-    },
-  });
-
-  await prisma.account.createMany({
-    data: [regularUser, adminUser].map((user) => ({
-      id: randomUUID(),
-      accountId: user.id,
-      providerId: "credential",
-      userId: user.id,
-      password: passwordHash,
-      createdAt: now,
-      updatedAt: now,
-    })),
-  });
-
   const completedSource = await prisma.source.create({
     data: {
       type: "youtube",
@@ -128,14 +103,6 @@ export default async function globalSetup() {
     seedPath,
     JSON.stringify(
       {
-        regular: {
-          email: regularEmail,
-          password,
-        },
-        admin: {
-          email: adminEmail,
-          password,
-        },
         completedTaskId: completedTask.id,
         queuedTaskId: queuedTask.id,
         completedSourceTitle: completedSource.title,

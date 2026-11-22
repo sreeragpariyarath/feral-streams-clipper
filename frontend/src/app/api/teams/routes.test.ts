@@ -61,11 +61,8 @@ vi.mock("@/lib/monetization", () => ({ monetizationEnabled: true }));
 import * as teamsRoute from "./route";
 import * as activeRoute from "./active/route";
 import * as teamDetailRoute from "./[teamId]/route";
-import * as invitationsRoute from "./[teamId]/invitations/route";
 import * as memberRoute from "./[teamId]/members/[memberUserId]/route";
 import * as seatsRoute from "./[teamId]/seats/route";
-import * as inviteLookupRoute from "./invitations/[token]/route";
-import * as inviteAcceptRoute from "./invitations/[token]/accept/route";
 
 const jsonReq = (body: unknown, method = "POST") =>
   new Request("http://localhost:3107/api/teams", {
@@ -100,7 +97,6 @@ describe("Next.js Team API routes", () => {
     expect((await activeRoute.POST(jsonReq({ teamId: "t1" }))).status).toBe(401);
     expect((await teamDetailRoute.GET(new Request("http://localhost"), ctx({ teamId: "t1" }))).status).toBe(401);
     expect((await seatsRoute.POST(jsonReq({ seats: 5 }), ctx({ teamId: "t1" }))).status).toBe(401);
-    expect((await inviteAcceptRoute.POST(new Request("http://localhost"), ctx({ token: "a".repeat(32) }))).status).toBe(401);
   });
 
   it("creates a team and sets the active workspace cookie", async () => {
@@ -265,35 +261,6 @@ describe("Next.js Team API routes", () => {
     expect(deleted.headers.get("set-cookie")).toContain("supoclip_team_id=;");
   });
 
-  it("creates invitation and returns inviteUrl even if SES email delivery fails", async () => {
-    prismaMock.teamMember.findUnique.mockResolvedValue({ role: "owner" });
-    prismaMock.team.findUnique.mockResolvedValue({
-      id: "t1",
-      name: "Clip Squad",
-      seat_limit: 5,
-      plan: "team",
-      subscription_status: "active",
-    });
-    prismaMock.teamMember.findFirst.mockResolvedValue(null);
-    prismaMock.teamInvitation.findFirst.mockResolvedValue(null);
-    prismaMock.teamMember.count.mockResolvedValue(1);
-    prismaMock.teamInvitation.count.mockResolvedValue(0);
-    prismaMock.teamInvitation.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
-      id: "inv-1",
-      ...data,
-      created_at: new Date(),
-    }));
-    fetchBackendMock.mockRejectedValueOnce(new Error("SES unavailable"));
-
-    const res = await invitationsRoute.POST(
-      jsonReq({ email: "editor@example.com", role: "member" }),
-      ctx({ teamId: "t1" }),
-    );
-    expect(res.status).toBe(201);
-    const body = await res.json();
-    expect(body.emailSent).toBe(false);
-    expect(body.inviteUrl).toContain("/invite/");
-  });
 
   it("enforces owner-only billing & seat routes and clears cookie when a member leaves", async () => {
     // Admin is blocked from seat updates
@@ -321,51 +288,6 @@ describe("Next.js Team API routes", () => {
     expect(leaveRes.headers.get("set-cookie")).toContain("supoclip_team_id=;");
   });
 
-  it("looks up invitations publicly and sets workspace cookie upon acceptance", async () => {
-    const token = "b".repeat(32);
-    prismaMock.teamInvitation.findUnique.mockResolvedValueOnce({
-      id: "inv-1",
-      team_id: "t1",
-      email: "editor@example.com",
-      role: "member",
-      accepted_at: null,
-      revoked_at: null,
-      expires_at: new Date(Date.now() + 60_000),
-      team: { id: "t1", name: "Clip Squad" },
-      inviter: { name: "Owner", email: "owner@example.com" },
-    });
-    sessionMock.mockResolvedValueOnce(null);
-
-    const lookup = await inviteLookupRoute.GET(new Request("http://localhost"), ctx({ token }));
-    expect(lookup.status).toBe(200);
-    const lookupBody = await lookup.json();
-    expect(lookupBody.signedIn).toBe(false);
-    expect(lookupBody.invitation.status).toBe("valid");
-
-    // Signed in with matching email accepts invite and switches active workspace cookie
-    sessionMock.mockResolvedValueOnce({ user: { id: "u-editor", email: "Editor@Example.com" } });
-    // Read once to find the team to lock, then again under the lock.
-    prismaMock.teamInvitation.findUnique.mockResolvedValueOnce({ team_id: "t1" });
-    prismaMock.teamInvitation.findUnique.mockResolvedValueOnce({
-      id: "inv-1",
-      team_id: "t1",
-      email: "editor@example.com",
-      role: "member",
-      accepted_at: null,
-      revoked_at: null,
-      expires_at: new Date(Date.now() + 60_000),
-      team: { id: "t1", name: "Clip Squad", seat_limit: 5 },
-    });
-    prismaMock.teamMember.findUnique.mockResolvedValueOnce(null);
-    prismaMock.teamMember.count.mockResolvedValueOnce(1);
-    prismaMock.team.findUniqueOrThrow.mockResolvedValueOnce({ id: "t1", name: "Clip Squad", seat_limit: 5 });
-    prismaMock.teamMember.create.mockResolvedValueOnce({ id: "m2" });
-    prismaMock.teamInvitation.update.mockResolvedValueOnce({ id: "inv-1" });
-
-    const accepted = await inviteAcceptRoute.POST(new Request("http://localhost", { method: "POST" }), ctx({ token }));
-    expect(accepted.status).toBe(200);
-    expect(accepted.headers.get("set-cookie")).toContain("supoclip_team_id=t1");
-  });
 
   it("updates and clears per-member generation limits via PATCH member route", async () => {
     // Reject empty payload

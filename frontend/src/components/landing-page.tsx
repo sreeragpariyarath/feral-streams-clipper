@@ -35,7 +35,6 @@ import { SocialProviderIcon } from "@/components/social-provider-icon";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { VIDEO_SOURCE_LABELS, VideoSourceIcon } from "@/components/video-source-icon";
-import { catalogKey } from "@/i18n/config";
 import { isLandingOnlyModeEnabled } from "@/lib/app-flags";
 import {
   annualFullPrice,
@@ -51,11 +50,6 @@ import {
   socialPublishingStage,
   type BillingInterval,
 } from "@/lib/billing-plans";
-import {
-  SELF_HOSTING_GUIDE_HREF,
-  getMarketingLink,
-  type MarketingLink,
-} from "@/lib/marketing-links";
 import { APP_STORE_URL, DISCORD_COMMUNITY_URL, GITHUB_URL, HOSTED_APP_URL, PRODUCT_HUNT_BADGE_URL, PRODUCT_HUNT_URL, SOURCE_LICENSE_URL } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
@@ -69,21 +63,8 @@ const NAV_LINKS = [
   { href: "#publish", key: "publishing" },
   { href: "#pricing", key: "pricing" },
   { href: "#open-source", key: "openSource" },
-  { href: "/examples", key: "examples" },
-  { href: "/faq", key: "faq" },
-  { href: "/blog", key: "blog" },
-  { href: "/affiliate", key: "affiliate" },
 ] as const;
 
-// Featured on the landing page; the footer links every marketing page.
-const SEO_RESOURCES = [
-  "/blog/podcast-to-shorts",
-  "/blog/find-best-moments-in-video",
-  "/ai-video-clipper",
-  "/youtube-shorts-clipper",
-  "/open-source-video-clipper",
-  "/blog/twitch-vod-to-shorts",
-].map((href) => getMarketingLink(href)).filter((link): link is MarketingLink => Boolean(link));
 
 function getPlans(
   t: Translate,
@@ -249,8 +230,8 @@ export default function LandingPage() {
           )}
         >
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo.png" alt="SupoClip" width={24} height={24} className="rounded-md dark:invert" />
-            <span className="font-display text-[17px] font-bold tracking-tight">SupoClip</span>
+            <Image src="/logo.png" alt="Feral Streams" width={24} height={24} className="rounded-md" />
+            <span className="font-display text-[17px] font-bold tracking-tight">Feral Streams</span>
           </Link>
 
           <div className="hidden items-center gap-1 xl:flex">
@@ -518,8 +499,8 @@ export default function LandingPage() {
                       <div className="flex flex-col gap-3">
                         <p className="text-xs leading-relaxed text-muted-foreground">{t("pricing.selfHost.setup")}</p>
                         <Button asChild variant="outline" size="lg" className="h-11 w-full rounded-full text-sm">
-                          <Link href={SELF_HOSTING_GUIDE_HREF}>
-                            {t(`links.${catalogKey(SELF_HOSTING_GUIDE_HREF)}.label`)}
+                          <Link href={`${GITHUB_URL}/blob/main/docs/setup.md`}>
+                            {t("pricing.selfHostGuide")}
                             <ArrowRight className="size-4" />
                           </Link>
                         </Button>
@@ -677,7 +658,7 @@ export default function LandingPage() {
             <p className="mx-auto mt-10 max-w-md text-center text-sm text-muted-foreground">{t("pricing.clipsNote")}</p>
             <p className="mx-auto mt-2 max-w-md text-center text-xs text-muted-foreground">
               {t("pricing.selfHostNote")}{" "}
-              <Link href={SELF_HOSTING_GUIDE_HREF} className="underline underline-offset-2 transition-colors hover:text-foreground">
+              <Link href={`${GITHUB_URL}/blob/main/docs/setup.md`} className="underline underline-offset-2 transition-colors hover:text-foreground">
                 {t("pricing.selfHostGuide")}
               </Link>
               .
@@ -762,7 +743,7 @@ export default function LandingPage() {
                   </a>
                 </Button>
                 <Button asChild variant="outline" className="rounded-full bg-background">
-                  <Link href={SELF_HOSTING_GUIDE_HREF}>{t(`links.${catalogKey(SELF_HOSTING_GUIDE_HREF)}.label`)}</Link>
+                  <Link href={`${GITHUB_URL}/blob/main/docs/setup.md`}>{t("pricing.selfHostGuide")}</Link>
                 </Button>
               </div>
             </Reveal>
@@ -787,41 +768,6 @@ export default function LandingPage() {
               </pre>
             </div>
           </Reveal>
-        </div>
-      </section>
-
-      {/* ─── GUIDES ─── */}
-      <section id="guides" className="scroll-mt-24 py-24 md:py-32">
-        <div className="mx-auto max-w-6xl px-6">
-          <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
-            <SectionHeading eyebrow={t("guides.eyebrow")} title={t("guides.title")} body={t("guides.body")} align="left" />
-          </div>
-          <div className="mt-12 grid border-t md:grid-cols-2 md:gap-x-12">
-            {SEO_RESOURCES.map((resource, index) => (
-              <Reveal key={resource.href} delay={(index % 2) * 0.06}>
-                <Link
-                  href={resource.href}
-                  lang={resource.language}
-                  className="group flex items-start justify-between gap-6 border-b py-6 transition-colors"
-                >
-                  <span>
-                    <span className="text-sm text-muted-foreground">
-                      {t(`links.${catalogKey(resource.href)}.eyebrow`)}
-                    </span>
-                    <span className="mt-2 block text-lg font-semibold tracking-tight underline-offset-4 group-hover:underline">
-                      {t(`links.${catalogKey(resource.href)}.title`)}
-                    </span>
-                    <span className="mt-1.5 block text-sm leading-relaxed text-muted-foreground">
-                      {t(`links.${catalogKey(resource.href)}.description`)}
-                    </span>
-                  </span>
-                  <span className="mt-1 flex size-9 shrink-0 items-center justify-center rounded-full border transition-colors group-hover:bg-foreground group-hover:text-background">
-                    <ArrowUpRight className="size-4" />
-                  </span>
-                </Link>
-              </Reveal>
-            ))}
-          </div>
         </div>
       </section>
 

@@ -57,7 +57,7 @@ describe("feature tours", () => {
   it("walks through every page and ends back on the create screen", () => {
     const welcome = FEATURE_TOURS.find((tour) => tour.id === "welcome")!;
     expect(welcome.steps.every((step) => step.path?.startsWith("/"))).toBe(true);
-    expect(new Set(welcome.steps.map((step) => step.path))).toEqual(new Set(["/", "/list", "/settings/social", "/analytics", "/settings/api-keys", "/settings"]));
+    expect(new Set(welcome.steps.map((step) => step.path))).toEqual(new Set(["/", "/list", "/settings/social", "/settings/api-keys", "/settings"]));
     expect(welcome.steps.at(-1)!.path).toBe("/");
     // A feature tour stays on its page.
     for (const tour of FEATURE_TOURS.filter((entry) => entry.audience !== "new")) expect(tour.steps.every((step) => step.path === undefined)).toBe(true);

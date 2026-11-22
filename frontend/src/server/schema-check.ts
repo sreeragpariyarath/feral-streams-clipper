@@ -50,12 +50,12 @@ export async function warnIfSchemaOutOfDate(): Promise<void> {
     const missing = findMissingColumns(expectedColumns(), present);
     if (missing.length === 0) return;
     console.error(
-      `[SupoClip] The database is missing ${missing.length} table(s)/column(s) the app expects: ` +
+      `[Feral Streams] The database is missing ${missing.length} table(s)/column(s) the app expects: ` +
         `${missing.slice(0, 12).join(", ")}${missing.length > 12 ? ", ..." : ""}. ` +
         `Sign-up and sign-in will fail with a 500 until this is fixed. ` +
         `From the repository folder run: ${REPAIR_COMMAND}`,
     );
   } catch (error) {
-    console.warn("[SupoClip] Could not check the database schema at startup", error);
+    console.warn("[Feral Streams] Could not check the database schema at startup", error);
   }
 }

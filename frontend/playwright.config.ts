@@ -15,7 +15,12 @@ const backendBaseUrl = `http://127.0.0.1:${backendPort}`;
 
 export default defineConfig({
   testDir: "./e2e",
-  testIgnore: ["polish.spec.ts", "agents-assistants.spec.ts", "broll.spec.ts", "editor-broll.spec.ts", "editor-ai.spec.ts", "editor-studio.spec.ts", "editor-recovery.spec.ts", "local-workflow.spec.ts", "editor-effects.spec.ts", "fx-parity.spec.ts"],
+  projects: [
+    { name: "smoke", testMatch: "app.spec.ts" },
+    ...(process.env.PLAYWRIGHT_LOCAL_MEDIA === "1"
+      ? [{ name: "local-media", testMatch: "local-workflow.spec.ts" }]
+      : []),
+  ],
   fullyParallel: false,
   retries: 0,
   // `next dev` compiles each route on first visit, which can outlast the 5s default.
@@ -56,6 +61,8 @@ export default defineConfig({
         DATABASE_URL: databaseUrl,
         NEXT_PUBLIC_APP_URL: frontendBaseUrl,
         BETTER_AUTH_URL: frontendBaseUrl,
+        SUPOCLIP_LOCAL_OWNER_ID: "feral-e2e-owner",
+        SUPOCLIP_LOCAL_ORIGIN: frontendBaseUrl,
         NEXT_PUBLIC_API_URL: backendBaseUrl,
         BACKEND_INTERNAL_URL: backendBaseUrl,
         BACKEND_AUTH_SECRET: backendAuthSecret,

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages, getTranslations } from "next-intl/server";
-import { Geist, Geist_Mono, Syne } from "next/font/google";
+import { Inter, Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { AttributionTracker } from "@/components/attribution-tracker";
@@ -14,7 +14,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { intlLocale } from "@/i18n/config";
 import { APP_STORE_ID, COMPANY_NAME, getSiteUrl } from "@/lib/site";
 
-const geistSans = Geist({
+const geistSans = Inter({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
@@ -24,7 +24,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const syne = Syne({
+const syne = Plus_Jakarta_Sans({
   variable: "--font-syne",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
@@ -47,9 +47,9 @@ export async function generateMetadata(): Promise<Metadata> {
   },
   description: t("description"),
   metadataBase: new URL(getSiteUrl()),
-  applicationName: "SupoClip",
-  authors: [{ name: "SupoClip Team", url: getSiteUrl() }],
-  creator: "SupoClip Team",
+  applicationName: "Feral Streams",
+  authors: [{ name: "Feral Streams Team", url: getSiteUrl() }],
+  creator: "Feral Streams Team",
   publisher: COMPANY_NAME,
   category: t("category"),
   icons: {
@@ -61,7 +61,7 @@ export async function generateMetadata(): Promise<Metadata> {
   openGraph: {
     title: t("title"),
     description: t("openGraphDescription"),
-    siteName: "SupoClip",
+    siteName: "Feral Streams",
     type: "website",
   },
   twitter: {

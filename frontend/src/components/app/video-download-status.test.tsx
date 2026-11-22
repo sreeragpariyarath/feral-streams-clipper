@@ -18,7 +18,6 @@ it("shows an active incident and links to the full status page", async () => {
 
   expect(await screen.findByText("YouTube imports · Outage")).toBeInTheDocument();
   expect(screen.getByText("New imports may fail before processing starts.")).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "View status page" })).toHaveAttribute("href", "/status");
 });
 
 it("hides the banner when service is operational", async () => {

@@ -6,6 +6,16 @@ Add a line here when a pull request changes something a user can see. Use **New*
 
 ## 2026-11-22
 
+- **Under the hood:** Removed unused components, sample clips, and asset sources from retired screens. ([Architecture guide](https://github.com/FujiwaraChoki/supoclip/blob/main/docs/architecture.md))
+
+- **Improved:** Removed public share, social analytics, administration, and product-update email endpoints associated with retired screens. ([API guide](https://github.com/FujiwaraChoki/supoclip/blob/main/docs/api-reference.md))
+
+- **Improved:** Removed public content, analytics, administration, invitations, share viewer, email and status pages from the clipper frontend. ([Setup guide](https://github.com/FujiwaraChoki/supoclip/blob/main/docs/setup.md))
+
+- **Improved:** Removed unused account access, OAuth consent, privacy, demo, example, and affiliate pages from the local clipper. ([Setup guide](https://github.com/FujiwaraChoki/supoclip/blob/main/docs/setup.md))
+
+- **Improved:** The Feral Streams Clipper interface uses English for all users. ([Configuration guide](https://github.com/FujiwaraChoki/supoclip/blob/main/docs/configuration.md))
+
 - **Fixed:** Local installations disable checkout and subscription management. ([Setup guide](https://github.com/FujiwaraChoki/supoclip/blob/main/docs/setup.md))
 
 - **New:** Local installations can open the clipper without signing in and keep an existing Library. ([Setup guide](https://github.com/FujiwaraChoki/supoclip/blob/main/docs/setup.md))

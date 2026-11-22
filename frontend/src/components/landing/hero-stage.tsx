@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { motion } from "motion/react";
 import { ArrowRight, CalendarClock, Captions, Check, Play, Target, Upload, Volume2, VolumeX } from "lucide-react";
@@ -93,7 +92,7 @@ function StepLabel({ n, children }: { n: number; children: React.ReactNode }) {
   );
 }
 
-/** The hero in three steps: a long video, the clip SupoClip cut from it, the scheduled post. */
+/** The hero in three steps: a long video, the clip Feral Streams cut from it, the scheduled post. */
 export function HeroStage() {
   const t = useTranslations("marketing.hero.stage");
   const locale = useLocale();
@@ -278,10 +277,6 @@ export function HeroStage() {
                 />
               ))}
             </div>
-            <Link href="/demo" className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground">
-              {t("howMade")}
-              <ArrowRight className="size-3" />
-            </Link>
           </div>
         </div>
 

@@ -3,7 +3,6 @@ import { createServer, type Server } from "node:http";
 import { http, passthrough } from "msw";
 
 import { GET as getTask } from "@/app/api/tasks/[...path]/route";
-import { GET as getShare } from "@/app/api/share/[...path]/route";
 import { server as mockServer } from "@/test/setup";
 
 vi.mock("@/server/session", () => ({
@@ -12,7 +11,6 @@ vi.mock("@/server/session", () => ({
 
 const proxies = [
   { name: "task", get: getTask, path: ["task-1", "clips", "clip-1", "file"] },
-  { name: "share", get: getShare, path: ["token-1", "clips", "clip-1", "file"] },
 ];
 
 async function listen(server: Server) {

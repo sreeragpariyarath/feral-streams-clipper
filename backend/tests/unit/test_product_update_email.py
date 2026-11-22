@@ -153,19 +153,3 @@ async def test_ses_refuses_product_updates_without_unsubscribe_headers(service, 
     sender._send("a@example.com", EmailContent("One", "One", "One"))
     sender._send("b@example.com", EmailContent("Two", "Two", "Two"))
     assert len(created) == 1 and created[0].send_email.call_count == 2
-
-
-async def test_public_pages_report_missing_signing_secret_as_unavailable(service, monkeypatch):
-    from src.api.routes import email_preferences
-    from src.repositories.email_preference_repository import EmailPreferenceRepository
-
-    token = token_for(service)
-    service.config.backend_auth_secret = None
-    monkeypatch.setattr(email_preferences, "ProductUpdateEmailService",
-                        lambda db: ProductUpdateEmailService(db, service.config))
-    monkeypatch.setattr(EmailPreferenceRepository, "get_product_update_recipient",
-                        AsyncMock(return_value=service._recipient.return_value))
-    for route in (email_preferences.confirm_unsubscribe, email_preferences.unsubscribe):
-        response = await route(token=token, db=service.db)
-        assert response.status_code == 503
-        assert response.headers["cache-control"] == "no-store"

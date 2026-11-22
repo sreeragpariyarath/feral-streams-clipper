@@ -633,3 +633,7 @@ If a route seems broken:
 - [Architecture](./architecture.md)
 - [Development](./development.md)
 - [Troubleshooting](./troubleshooting.md)
+
+## Feral Streams Clipper
+
+Public clip shares, the social performance dashboard endpoints, admin endpoints, and the product-update unsubscribe page are unavailable in this fork. Use the authenticated clip download routes to export MP4s.

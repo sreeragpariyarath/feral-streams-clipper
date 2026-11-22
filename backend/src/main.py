@@ -24,7 +24,7 @@ from .database import AsyncSessionLocal, close_db, configure_database, get_db, i
 from .runtime_settings import load_runtime_settings_cache
 from .workers.job_queue import JobQueue
 from .api.routes import tasks
-from .api.routes.admin import router as admin_router
+
 from .observability import (
     TRACE_HEADER,
     clear_trace_id,
@@ -218,15 +218,14 @@ def create_app(
     from .api.routes.editor import router as editor_router
     app.include_router(clip_export_router)
     app.include_router(editor_router)
-    app.include_router(admin_router)
 
     from .api.routes.media import router as media_router
     from .api.routes.feedback import router as feedback_router
-    from .api.routes.admin_feedback import router as admin_feedback_router
+
     from .api.routes.api_keys import router as api_keys_router
     from .api.routes.account import router as account_router
     from .api.routes.social import router as social_router
-    from .api.routes.email_preferences import router as email_preferences_router
+
     from .api.routes.feature_flags import router as feature_flags_router
     from .api.routes.fx import router as fx_router
     from .api.routes.teams import router as teams_router
@@ -235,11 +234,9 @@ def create_app(
 
     app.include_router(media_router)
     app.include_router(feedback_router)
-    app.include_router(admin_feedback_router)
     app.include_router(api_keys_router)
     app.include_router(account_router)
     app.include_router(social_router)
-    app.include_router(email_preferences_router)
     app.include_router(feature_flags_router)
     app.include_router(fx_router)
     app.include_router(teams_router)

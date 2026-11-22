@@ -282,26 +282,6 @@ async def create_post(request: Request, db: AsyncSession = Depends(get_db)):
     return {"post": post}
 
 
-@router.get("/performance")
-async def get_performance(request: Request, db: AsyncSession = Depends(get_db)):
-    """Aggregate audience performance, grouped the same way the AI uses it."""
-    ctx = await _allowed_context(request, db)
-    return await _service(request, db).get_performance_summary(
-        ctx.user_id, team_id=ctx.team_id
-    )
-
-
-@router.get("/performance/timeseries")
-async def get_views_timeseries(
-    request: Request, db: AsyncSession = Depends(get_db), days: int = 30
-):
-    """Daily new views across published posts, for the analytics chart."""
-    ctx = await _allowed_context(request, db)
-    return await _service(request, db).get_views_timeseries(
-        ctx.user_id, days=days, team_id=ctx.team_id
-    )
-
-
 @router.get("/posts/{post_id}")
 async def get_post(post_id: str, request: Request, db: AsyncSession = Depends(get_db)):
     ctx = await _allowed_context(request, db)
