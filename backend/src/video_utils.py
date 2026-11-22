@@ -56,6 +56,7 @@ from .media.captions import (
     ass_fonts_dir,
     build_assemblyai_ass_subtitles,
 )
+from .media.hook_card import apply_hook_card, hook_card_enabled
 from .media.render_ranges import burned_hook_title, point_labels_for, resolve_render_ranges, segment_bounds
 from .media.reframing import (
     render_reframed_clip_ffmpeg,
@@ -503,6 +504,8 @@ def create_optimized_clip(
                 time_map=None,
                 censor_spans=None,
             ) -> Optional[Path]:
+                if hook_card_enabled() and fx is None:
+                    hook = None  # the hook card is laid over the finished clip instead
                 if not (include_captions or hook or point_labels):
                     return None
                 built = build_assemblyai_ass_subtitles(
@@ -616,6 +619,13 @@ def create_optimized_clip(
                 layout_report["broll_applied"] = broll_applied
             if not framed_ok:
                 raise RuntimeError("ffmpeg reframe render failed")
+
+            if hook_title and hook_card_enabled():
+                try:
+                    apply_hook_card(final_clip_path, hook_title, plan_report.get("hook_center_y"))
+                except Exception as exc:
+                    # The clip is still good without the card.
+                    logger.warning(f"Hook card skipped: {exc}")
 
             shutil.move(str(final_clip_path), str(output_path))
             logger.info(f"Successfully created clip with ffmpeg: {output_path}")
